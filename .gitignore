@@ -1,0 +1,7 @@
+# IDE specific files
+.idea
+__pycache__/
+
+# plots & graphics
+plots
+.svg
