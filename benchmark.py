@@ -64,7 +64,7 @@ def omfr_investigate_buffer_size():
     ax1.set_ylim(min(average_times_per_buffer)-0.0001,
                  max(average_times_per_buffer)+0.0001)
     ax1.legend()
-    plt.savefig("plots/omfr_investigate_buffer_size_2.svg")
+    plt.savefig("plots/omfr_investigate_buffer_size.svg")
     plt.show()
 
 
