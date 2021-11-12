@@ -50,8 +50,7 @@ def omfr_investigate_buffer_size():
     bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=10)
     for b in buffer_sizes:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
-            buffer_size=b, num_buffers=100, firing_rate=50,
-            num_neurons=1, num_processes=1))
+            buffer_size=b, num_buffers=100, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer size influence on runtime of online MFR")
     ax1.semilogx(buffer_sizes, average_times_per_buffer,
