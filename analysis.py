@@ -14,7 +14,6 @@ class OnlineMeanFiringRate:
 
         :param spike_buffer: neo.Spiketrain
             contains the spikes of the neuron
-
         :return self.current_mfr: float
             mean firing rate of a neuron
 
@@ -23,22 +22,23 @@ class OnlineMeanFiringRate:
         x'_bar = x_bar + (x_n+1 - x_bar)/(n+1)
         """
         buffer_mfr = mean_firing_rate(spike_buffer).rescale(pq.Hz)
-        self.current_mfr += (buffer_mfr-self.current_mfr)/(self.buffer_counter+1)
         self.buffer_counter += 1
+        self.current_mfr += (buffer_mfr-self.current_mfr) / self.buffer_counter
         return self.current_mfr
 
 
 class OnlineInterSpikeInterval:
     def __init__(self):
         self.last_spike_time_of_previous_buffer = None
-        self.current_isi = [] # in sec
-        self.bin_size = 0.0005 # in sec
-        self.bins_edges = np.asarray([self.bin_size * i for i in range(int(1 / self.bin_size))])
-        self.current_isi_histogram = np.empty(shape=(self.bins_edges.shape[0]-1))
+        self.current_isi = []  # in sec
+        self.bin_size = 0.0005  # in sec
+        self.bins_edges = np.asarray([self.bin_size * i
+                                      for i in range(int(1 / self.bin_size))])
+        self.current_isi_histogram = np.empty(shape=(len(self.bins_edges)-1))
 
     def calculate_isi(self, spike_buffer, mode="raw"):
         """
-        Calculates the inter-spike interval of one single neuron.
+        Calculates the inter-spike interval of a single neuron.
 
         :param spike_buffer: neo.Spiketrain
             contains the spikes of the neuron
@@ -58,24 +58,23 @@ class OnlineInterSpikeInterval:
         be returned
 
         """
-        if spike_buffer.size:  # case1: spike_buffer not empty
-            if self.last_spike_time_of_previous_buffer:  # for second till last buffer
-                buffer_isi = isi(np.append(self.last_spike_time_of_previous_buffer, spike_buffer))
-                self.last_spike_time_of_previous_buffer = spike_buffer[-1]
+        if spike_buffer.size is not 0:  # case1: spike_buffer not empty
+            if self.last_spike_time_of_previous_buffer is not None:
+                # from second to last buffer
+                buffer_isi = isi(np.append(
+                    self.last_spike_time_of_previous_buffer, spike_buffer))
             else:  # for first buffer
                 buffer_isi = isi(spike_buffer)
-                self.last_spike_time_of_previous_buffer = spike_buffer[-1]
+            self.last_spike_time_of_previous_buffer = spike_buffer[-1]
             if mode == "raw":
                 self.current_isi.extend(buffer_isi.magnitude.tolist())
+                return self.current_isi
             elif mode == "histogram":
                 buffer_hist, _ = np.histogram(buffer_isi, bins=self.bins_edges)
                 self.current_isi_histogram += buffer_hist
+                return self.current_isi_histogram
         else:  # case2: spike_buffer is empty
             pass
-        if mode == "raw":
-            return self.current_isi
-        elif mode == "histogram":
-            return self.current_isi_histogram
 
 
 class OnlinePearsonCorrelationCoefficient:
@@ -92,7 +91,7 @@ class OnlinePearsonCorrelationCoefficient:
         """
         Calculates Pearson's Correlation Coefficient between two neurons.
 
-        :param spike_buffer: elephant.conversion.BinnedSpikeTrain
+        :param binned_spike_buffer: elephant.conversion.BinnedSpikeTrain
             contains one binned spiketrain for each neuron of user defined
             binsize
         :return self.R_xy: float
@@ -116,12 +115,15 @@ class OnlinePearsonCorrelationCoefficient:
         Electronic Circuits Systems (DDECS), 184–89, 2017.
         https://doi.org/10.1109/DDECS.2017.7934563.
         """
-        spike_count_array = binned_spike_buffer.to_array() # spike count per bin per neuron
+        # spike count per bin per neuron
+        spike_count_array = binned_spike_buffer.to_array()
         for b in range(binned_spike_buffer.num_bins):
             x_n_plus_1 = spike_count_array[0][b]
             y_n_plus_1 = spike_count_array[1][b]
-            n = self.buffer_counter * binned_spike_buffer.num_bins + b  # number of bins in total
-            self.C_s += n / (n + 1) * (x_n_plus_1 - self.x_bar) * (y_n_plus_1 -self.y_bar)
+            # n = number of bins in total considering all buffers
+            n = self.buffer_counter * binned_spike_buffer.num_bins + b
+            self.C_s += n / (n + 1) * (x_n_plus_1 - self.x_bar) * \
+                            (y_n_plus_1 - self.y_bar)
             x_bar_new = self.x_bar + (x_n_plus_1 - self.x_bar) / (n + 1)
             y_bar_new = self.y_bar + (y_n_plus_1 - self.y_bar) / (n + 1)
             self.M_x += (x_n_plus_1 - self.x_bar) * (x_n_plus_1 - x_bar_new)
