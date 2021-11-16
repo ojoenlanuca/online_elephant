@@ -36,25 +36,24 @@ class TestOnlineMeanFiringRate(unittest.TestCase):
         # i.e. loop over spiketrain list and call calculate_mfr()
         # for neo.Spiketrain input
         omfr_all_neurons_neo = [OnlineMeanFiringRate()
-                            for _ in range(self.num_neurons)]
+                                for _ in range(self.num_neurons)]
         tic1_neo = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
                 omfr_all_neurons_neo[j].calculate_mfr(spike_buffer=st)
         final_online_mfr_neo = [omfr_all_neurons_neo[j].current_mfr
-                            for j in range(self.num_neurons)]
+                                for j in range(self.num_neurons)]
         toc1_neo = perf_counter_ns()
         # for numpy.ndarray input
         omfr_all_neurons_np = [OnlineMeanFiringRate()
-                            for _ in range(self.num_neurons)]
+                               for _ in range(self.num_neurons)]
         tic1_np = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
                 omfr_all_neurons_np[j].calculate_mfr(spike_buffer=st.magnitude)
         final_online_mfr_np = [omfr_all_neurons_np[j].current_mfr
-                            for j in range(self.num_neurons)]
+                               for j in range(self.num_neurons)]
         toc1_np = perf_counter_ns()
-
 
         # concatenate each list of spiketrains to one spiketrain per neuron
         # and call 'offline' mean_firing_rate()
@@ -100,43 +99,6 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         cls.num_buffers = 100
         cls.buff_size = 1  # in sec
 
-    def test_correctness_single_neuron(self):
-        """Test, if results of online and normal inter-spike interval
-        function are identical for single neuron."""
-        # create list of spiketrains
-        st_list = [homogeneous_poisson_process(
-            50*pq.Hz, t_start=self.buff_size*i*pq.s,
-            t_stop=(self.buff_size*i+self.buff_size)*pq.s)
-            for i in range(self.num_buffers)]
-
-        # simulate buffered reading/transport of spiketrains,
-        # i.e. loop over spiketrain list and call online_isi()
-        oisi_neuron1 = OnlineInterSpikeInterval()
-        tic1 = perf_counter_ns()
-        for st in st_list:
-            oisi_neuron1.calculate_isi(spike_buffer=st)
-        final_online_isi = oisi_neuron1.current_isi
-        toc1 = perf_counter_ns()
-
-        # concatenate list of spiketrains to one single spiketrain
-        # and call 'offline' isi()
-        t_start_first_st = st_list[0].t_start
-        t_stop_last_st = st_list[-1].t_stop
-        concatenated_st = neo.SpikeTrain(
-            np.concatenate([np.asarray(st) for st in st_list]) * pq.s,
-            t_start=t_start_first_st, t_stop=t_stop_last_st)
-        tic2 = perf_counter_ns()
-        normal_isi = isi(concatenated_st).magnitude.tolist()
-        toc2 = perf_counter_ns()
-
-        # compare results of normal isi and online isi
-        print(f"online_isi:  | run-time: {(toc1-tic1)*1e-9}sec\n"
-              f"normal_isi:  | run-time: {(toc2-tic2)*1e-9}sec\n"
-              f"ISI1: (t_online / t_normal)={(toc1-tic1)/(toc2-tic2)}")
-        np.testing.assert_allclose(
-            final_online_isi, normal_isi,
-            rtol=self.rtol, atol=self.atol)
-
     def test_correctness_multiple_neurons(self):
         """Test, if results of online and normal inter-spike interval
         function are identical multiple neurons."""
@@ -148,15 +110,26 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
 
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call calculate_isi()
-        oisi_all_neurons = [OnlineInterSpikeInterval()
-                            for _ in range(self.num_neurons)]
-        tic1 = perf_counter_ns()
+        # for neo.Spiketrain input
+        oisi_all_neurons_neo = [OnlineInterSpikeInterval()
+                                for _ in range(self.num_neurons)]
+        tic1_neo = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
-                oisi_all_neurons[j].calculate_isi(spike_buffer=st)
-        final_online_isi = [oisi_all_neurons[j].current_isi
+                oisi_all_neurons_neo[j].calculate_isi(spike_buffer=st)
+        final_online_isi_neo = [oisi_all_neurons_neo[j].current_isi
                             for j in range(self.num_neurons)]
-        toc1 = perf_counter_ns()
+        toc1_neo = perf_counter_ns()
+        # for np.ndarray input
+        oisi_all_neurons_np = [OnlineInterSpikeInterval()
+                               for _ in range(self.num_neurons)]
+        tic1_np = perf_counter_ns()
+        for j, st_list in enumerate(list_of_st_lists):
+            for st in st_list:
+                oisi_all_neurons_np[j].calculate_isi(spike_buffer=st.magnitude)
+        final_online_isi_np = [oisi_all_neurons_np[j].current_isi
+                               for j in range(self.num_neurons)]
+        toc1_np = perf_counter_ns()
 
         # concatenate list of spiketrains to one single spiketrain
         # and call 'offline' isi()
@@ -172,13 +145,22 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         toc2 = perf_counter_ns()
 
         # compare results of normal isi and online isi
-        print(f"online_isi:  | run-time: {(toc1-tic1)*1e-9}sec\n"
-              f"normal_isi:  | run-time: {(toc2-tic2)*1e-9}sec\n"
-              f"ISI2: (t_online / t_normal)={(toc1-tic1)/(toc2-tic2)}")
-        for j in range(self.num_neurons):
-            np.testing.assert_allclose(
-                final_online_isi[j], normal_isi[j],
-                rtol=self.rtol, atol=self.atol)
+        with self.subTest(msg="neo.Spiketrain input"):
+            print(f"online_isi:  | run-time: {(toc1_neo-tic1_neo)*1e-9}sec\n"
+                  f"normal_isi:  | run-time: {(toc2-tic2)*1e-9}sec\n"
+                  f"(t_online_neo/t_normal)={(toc1_neo-tic1_neo)/(toc2-tic2)}")
+            for j in range(self.num_neurons):
+                np.testing.assert_allclose(
+                    final_online_isi_neo[j], normal_isi[j],
+                    rtol=self.rtol, atol=self.atol)
+        with self.subTest(msg="np.ndarray input"):
+            print(f"online_isi:  | run-time: {(toc1_np-tic1_np)*1e-9}sec\n"
+                  f"normal_isi:  | run-time: {(toc2-tic2)*1e-9}sec\n"
+                  f"(t_online_np/t_normal)={(toc1_np-tic1_np)/(toc2-tic2)}")
+            for j in range(self.num_neurons):
+                np.testing.assert_allclose(
+                    final_online_isi_np[j], normal_isi[j],
+                    rtol=self.rtol, atol=self.atol)
 
 
 class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):

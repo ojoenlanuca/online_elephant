@@ -53,8 +53,8 @@ class OnlineInterSpikeInterval:
         """
         Calculates the inter-spike interval of a single neuron.
 
-        :param spike_buffer: neo.Spiketrain
-            contains the spikes of the neuron
+        :param spike_buffer: neo.Spiketrain or np.ndarray
+            contains the spiketimes of one neuron
         :param mode: "raw" or "histogram"
             ISI values are either returned as list or histogram with bin_edges
         :return
@@ -80,7 +80,11 @@ class OnlineInterSpikeInterval:
                 buffer_isi = isi(spike_buffer)
             self.last_spike_time_of_previous_buffer = spike_buffer[-1]
             if mode == "raw":
-                self.current_isi.extend(buffer_isi.magnitude.tolist())
+                if isinstance(spike_buffer, neo.SpikeTrain):
+                    self.current_isi.extend(buffer_isi.magnitude.tolist())
+                if isinstance(spike_buffer, np.ndarray) \
+                        and not isinstance(spike_buffer, neo.SpikeTrain):
+                    self.current_isi.extend(buffer_isi.tolist())
                 return self.current_isi
             elif mode == "histogram":
                 buffer_hist, _ = np.histogram(buffer_isi, bins=self.bins_edges)
