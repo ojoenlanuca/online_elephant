@@ -45,15 +45,15 @@ class BenchmarkOnlineMeanFiringRate:
 
 
 def omfr_investigate_buffer_size():
-    buffer_sizes = [0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000]
+    buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
-    bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=10)
+    bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=100)
     for b in buffer_sizes:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
             buffer_size=b, num_buffers=100, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer size influence on runtime of online MFR")
-    ax1.semilogx(buffer_sizes, average_times_per_buffer,
+    ax1.plot(buffer_sizes, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=buffer_sizes[0],
@@ -69,15 +69,15 @@ def omfr_investigate_buffer_size():
 
 
 def omfr_investigate_firing_rate():
-    firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000]
+    firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=10)
+    bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=100)
     for f in firing_rates:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
             buffer_size=1, num_buffers=100, firing_rate=f))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Firing rate influence on runtime of online MFR")
-    ax1.semilogx(firing_rates, average_times_per_buffer,
+    ax1.plot(firing_rates, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=firing_rates[0],
@@ -93,15 +93,15 @@ def omfr_investigate_firing_rate():
 
 
 def omfr_investigate_number_of_buffers():
-    num_buffers = [1, 5, 10, 50, 100, 500, 1000, 5000, 10000]
+    num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=10)
+    bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=100)
     for nb in num_buffers:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
             buffer_size=1, num_buffers=nb, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer count influence on runtime of online MFR")
-    ax1.semilogx(num_buffers, average_times_per_buffer,
+    ax1.plot(num_buffers, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=num_buffers[0],
@@ -151,15 +151,15 @@ class BenchmarkOnlineInterSpikeInterval:
 
 
 def oisi_investigate_buffer_size():
-    buffer_sizes = [0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000]
+    buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
-    boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=10)
+    boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=100)
     for b in buffer_sizes:
         average_times_per_buffer.append(boisi.do_benchmark_oisi(
             buffer_size=b, num_buffers=100, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer size influence on runtime of online ISI")
-    ax1.semilogx(buffer_sizes, average_times_per_buffer,
+    ax1.plot(buffer_sizes, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=buffer_sizes[0],
@@ -175,15 +175,15 @@ def oisi_investigate_buffer_size():
 
 
 def oisi_investigate_firing_rate():
-    firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000]
+    firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=10)
+    boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=100)
     for f in firing_rates:
         average_times_per_buffer.append(boisi.do_benchmark_oisi(
             buffer_size=1, num_buffers=100, firing_rate=f))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Firing Rate influence on runtime of online ISI")
-    ax1.semilogx(firing_rates, average_times_per_buffer,
+    ax1.plot(firing_rates, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=firing_rates[0],
@@ -199,15 +199,15 @@ def oisi_investigate_firing_rate():
 
 
 def oisi_investigate_number_of_buffers():
-    num_buffers = [1, 5, 10, 50, 100, 500, 1000, 5000, 10000]
+    num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=10)
+    boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=100)
     for nb in num_buffers:
         average_times_per_buffer.append(boisi.do_benchmark_oisi(
             buffer_size=1, num_buffers=nb, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer count influence on runtime of online ISI")
-    ax1.semilogx(num_buffers, average_times_per_buffer,
+    ax1.plot(num_buffers, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=num_buffers[0],
@@ -261,8 +261,7 @@ class BenchmarkOnlinePearsonCorrelationCoefficient:
 
 
 def opcc_investigate_buffer_size():
-    buffer_sizes = [0.1, 0.5, 1, 5, 10, 50]
-    # , 100, 500, 1000] other values take to long to compute
+    buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
     bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=10)
     for b in buffer_sizes:
@@ -270,7 +269,7 @@ def opcc_investigate_buffer_size():
             buffer_size=b, num_buffers=100, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer size influence on runtime of online PCC")
-    ax1.semilogx(buffer_sizes, average_times_per_buffer,
+    ax1.plot(buffer_sizes, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=buffer_sizes[0],
@@ -286,7 +285,7 @@ def opcc_investigate_buffer_size():
 
 
 def opcc_investigate_firing_rate():
-    firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000]
+    firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
     bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=10)
     for f in firing_rates:
@@ -294,7 +293,7 @@ def opcc_investigate_firing_rate():
             buffer_size=1, num_buffers=100, firing_rate=f))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Firing rate influence on runtime of online PCC")
-    ax1.semilogx(firing_rates, average_times_per_buffer,
+    ax1.plot(firing_rates, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=firing_rates[0],
@@ -310,7 +309,7 @@ def opcc_investigate_firing_rate():
 
 
 def opcc_investigate_number_of_buffers():
-    num_buffers = [1, 5, 10, 50, 100, 500, 1000, 5000, 10000]
+    num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
     bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=10)
     for nb in num_buffers:
@@ -318,7 +317,7 @@ def opcc_investigate_number_of_buffers():
             buffer_size=1, num_buffers=nb, firing_rate=50))
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle("Buffer count influence on runtime of online PCC")
-    ax1.semilogx(num_buffers, average_times_per_buffer,
+    ax1.plot(num_buffers, average_times_per_buffer,
                  label="average times per buffer", marker="x",
                  markerfacecolor="red", markeredgecolor='red')
     ax1.hlines(np.mean(average_times_per_buffer), xmin=num_buffers[0],
@@ -335,7 +334,7 @@ def opcc_investigate_number_of_buffers():
 
 if __name__ == '__main__':
     # MFR benchmarks
-    omfr_investigate_buffer_size()
+    # omfr_investigate_buffer_size()
     # omfr_investigate_firing_rate()
     # omfr_investigate_number_of_buffers()
     # omfr_investigate_number_of_neurons()
