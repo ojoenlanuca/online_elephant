@@ -28,15 +28,22 @@ class OnlineMeanFiringRate:
         recurrent formula for sample mean:
         x'_bar = x_bar + (x_n+1 - x_bar)/(n+1)
         """
-        if isinstance(spike_buffer, neo.SpikeTrain):
-            buffer_mfr = mean_firing_rate(spike_buffer).rescale(self._unit).magnitude
-        if isinstance(spike_buffer, np.ndarray) and \
-                not isinstance(spike_buffer, neo.SpikeTrain):
-            buffer_mfr = mean_firing_rate(
-                spike_buffer, t_start=self._buffer_counter * self._buffer_size,
-                t_stop=self._buffer_counter * self._buffer_size + self._buffer_size)
+        if len(spike_buffer) == 0:
+            buffer_mfr = 0
+        else:
+            if isinstance(spike_buffer, neo.SpikeTrain):
+                buffer_mfr = mean_firing_rate(spike_buffer).rescale(
+                    self._unit).magnitude
+            if isinstance(spike_buffer, np.ndarray) and \
+                    not isinstance(spike_buffer, neo.SpikeTrain):
+                buffer_mfr = mean_firing_rate(
+                    spike_buffer, t_start=self._buffer_counter *
+                                          self._buffer_size,
+                    t_stop=self._buffer_counter * self._buffer_size +
+                           self._buffer_size)
         self._buffer_counter += 1
-        self._current_mfr += (buffer_mfr - self._current_mfr) / self._buffer_counter
+        self._current_mfr += \
+            (buffer_mfr - self._current_mfr) / self._buffer_counter
         return self._current_mfr * self._unit
 
 
