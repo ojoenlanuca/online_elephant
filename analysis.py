@@ -1,3 +1,4 @@
+import neo
 import numpy as np
 import quantities as pq
 from elephant.statistics import mean_firing_rate, isi
@@ -5,26 +6,38 @@ from elephant.statistics import mean_firing_rate, isi
 
 class OnlineMeanFiringRate:
     def __init__(self):
-        self.current_mfr = 0*pq.Hz
-        self.buffer_counter = 0
+        self._unit = 1 * pq.Hz
+        self._current_mfr = 0  # in  Hz
+        self._buffer_counter = 0
+        self._buffer_size = 1   # in sec
+
+    @property
+    def current_mfr(self):
+        return self._current_mfr * self._unit
 
     def calculate_mfr(self, spike_buffer):
         """
         Calculates the mean firing rate of a single neuron.
 
-        :param spike_buffer: neo.Spiketrain
-            contains the spikes of the neuron
-        :return self.current_mfr: float
+        :param spike_buffer: neo.Spiketrain or np.ndarray
+            contains the spiketimes of one neuron
+        :return self.current_mfr: pq.Quantity
             mean firing rate of a neuron
 
         Notes:
         recurrent formula for sample mean:
         x'_bar = x_bar + (x_n+1 - x_bar)/(n+1)
         """
-        buffer_mfr = mean_firing_rate(spike_buffer).rescale(pq.Hz)
-        self.buffer_counter += 1
-        self.current_mfr += (buffer_mfr-self.current_mfr) / self.buffer_counter
-        return self.current_mfr
+        if isinstance(spike_buffer, neo.SpikeTrain):
+            buffer_mfr = mean_firing_rate(spike_buffer).rescale(self._unit).magnitude
+        if isinstance(spike_buffer, np.ndarray) and \
+                not isinstance(spike_buffer, neo.SpikeTrain):
+            buffer_mfr = mean_firing_rate(
+                spike_buffer, t_start=self._buffer_counter * self._buffer_size,
+                t_stop=self._buffer_counter * self._buffer_size + self._buffer_size)
+        self._buffer_counter += 1
+        self._current_mfr += (buffer_mfr - self._current_mfr) / self._buffer_counter
+        return self._current_mfr * self._unit
 
 
 class OnlineInterSpikeInterval:
