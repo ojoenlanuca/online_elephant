@@ -118,7 +118,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
             for st in st_list:
                 oisi_all_neurons_neo[j].calculate_isi(spike_buffer=st)
         final_online_isi_neo = [oisi_all_neurons_neo[j].current_isi
-                            for j in range(self.num_neurons)]
+                                for j in range(self.num_neurons)]
         toc1_neo = perf_counter_ns()
         # for np.ndarray input
         oisi_all_neurons_np = [OnlineInterSpikeInterval()
