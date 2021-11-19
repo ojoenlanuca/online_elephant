@@ -15,7 +15,7 @@ class OnlineMeanFiringRate:
     def current_mfr(self):
         return self._current_mfr * self._unit
 
-    def calculate_mfr(self, spike_buffer):
+    def update_mfr(self, spike_buffer):
         """
         Calculates the mean firing rate of a single neuron.
 
@@ -49,14 +49,15 @@ class OnlineMeanFiringRate:
 
 class OnlineInterSpikeInterval:
     def __init__(self):
-        self.last_spike_time_of_previous_buffer = None
+        self.buffer_size = 1  # in sec
+        self.last_spike_time = None
         self.current_isi = []  # in sec
         self.bin_size = 0.0005  # in sec
         self.bins_edges = np.asarray([self.bin_size * i
-                                      for i in range(int(1 / self.bin_size))])
+                                      for i in range(int(self.buffer_size / self.bin_size))])
         self.current_isi_histogram = np.empty(shape=(len(self.bins_edges)-1))
 
-    def calculate_isi(self, spike_buffer, mode="raw"):
+    def update_isi(self, spike_buffer, mode="raw"):
         """
         Calculates the inter-spike interval of a single neuron.
 
@@ -79,13 +80,13 @@ class OnlineInterSpikeInterval:
 
         """
         if spike_buffer.size is not 0:  # case1: spike_buffer not empty
-            if self.last_spike_time_of_previous_buffer is not None:
+            if self.last_spike_time is not None:
                 # from second to last buffer
                 buffer_isi = isi(np.append(
-                    self.last_spike_time_of_previous_buffer, spike_buffer))
+                    self.last_spike_time, spike_buffer))
             else:  # for first buffer
                 buffer_isi = isi(spike_buffer)
-            self.last_spike_time_of_previous_buffer = spike_buffer[-1]
+            self.last_spike_time = spike_buffer[-1]
             if mode == "raw":
                 if isinstance(spike_buffer, neo.SpikeTrain):
                     self.current_isi.extend(buffer_isi.magnitude.tolist())
@@ -111,7 +112,7 @@ class OnlinePearsonCorrelationCoefficient:
         self.C_s = 0  # sum_i=1_to_n (x_i - x_bar)(y_i - y_bar)
         self.R_xy = 0  # C_s / (sqrt(M_x) * sqrt(M_y))
 
-    def calculate_pcc(self, binned_spike_buffer):
+    def update_pcc(self, binned_spike_buffer):
         """
         Calculates Pearson's Correlation Coefficient between two neurons.
 
