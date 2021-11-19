@@ -40,7 +40,7 @@ class TestOnlineMeanFiringRate(unittest.TestCase):
         tic1_neo = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
-                omfr_all_neurons_neo[j].calculate_mfr(spike_buffer=st)
+                omfr_all_neurons_neo[j].update_mfr(spike_buffer=st)
         final_online_mfr_neo = [omfr_all_neurons_neo[j].current_mfr
                                 for j in range(self.num_neurons)]
         toc1_neo = perf_counter_ns()
@@ -50,7 +50,7 @@ class TestOnlineMeanFiringRate(unittest.TestCase):
         tic1_np = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
-                omfr_all_neurons_np[j].calculate_mfr(spike_buffer=st.magnitude)
+                omfr_all_neurons_np[j].update_mfr(spike_buffer=st.magnitude)
         final_online_mfr_np = [omfr_all_neurons_np[j].current_mfr
                                for j in range(self.num_neurons)]
         toc1_np = perf_counter_ns()
@@ -116,7 +116,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         tic1_neo = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
-                oisi_all_neurons_neo[j].calculate_isi(spike_buffer=st)
+                oisi_all_neurons_neo[j].update_isi(spike_buffer=st)
         final_online_isi_neo = [oisi_all_neurons_neo[j].current_isi
                                 for j in range(self.num_neurons)]
         toc1_neo = perf_counter_ns()
@@ -126,7 +126,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         tic1_np = perf_counter_ns()
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
-                oisi_all_neurons_np[j].calculate_isi(spike_buffer=st.magnitude)
+                oisi_all_neurons_np[j].update_isi(spike_buffer=st.magnitude)
         final_online_isi_np = [oisi_all_neurons_np[j].current_isi
                                for j in range(self.num_neurons)]
         toc1_np = perf_counter_ns()
@@ -186,7 +186,7 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
         # call calculate_pcc()
         opcc_neuron_pair1 = OnlinePearsonCorrelationCoefficient()
         tic1 = perf_counter_ns()
-        opcc_neuron_pair1.calculate_pcc(binned_spike_buffer=binned_st)
+        opcc_neuron_pair1.update_pcc(binned_spike_buffer=binned_st)
         toc1 = perf_counter_ns()
         final_online_pcc = opcc_neuron_pair1.R_xy
 
@@ -224,7 +224,7 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
         opcc_neuron_pair1 = OnlinePearsonCorrelationCoefficient()
         tic1 = perf_counter_ns()
         for binned_st in binned_st_list:
-            opcc_neuron_pair1.calculate_pcc(binned_spike_buffer=binned_st)
+            opcc_neuron_pair1.update_pcc(binned_spike_buffer=binned_st)
         final_online_pcc = opcc_neuron_pair1.R_xy
         toc1 = perf_counter_ns()
 

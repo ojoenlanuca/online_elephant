@@ -28,7 +28,7 @@ class BenchmarkOnlineMeanFiringRate:
                     t_stop=(buffer_size*i+buffer_size)*pq.s).magnitude
                 # measure runtime for one buffer
                 tic1 = perf_counter_ns()
-                omfr.calculate_mfr(spike_buffer=st)
+                omfr.update_mfr(spike_buffer=st)
                 toc1 = perf_counter_ns()
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
@@ -140,7 +140,7 @@ class BenchmarkOnlineInterSpikeInterval:
                     t_stop=(buffer_size*i+buffer_size)*pq.s)
                 # measure runtime for one buffer
                 tic1 = perf_counter_ns()
-                oisi.calculate_isi(spike_buffer=st, mode="histogram")
+                oisi.update_isi(spike_buffer=st, mode="histogram")
                 toc1 = perf_counter_ns()
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
@@ -256,7 +256,7 @@ class BenchmarkOnlinePearsonCorrelationCoefficient:
                 binned_st = BinnedSpikeTrain([st1, st2], bin_size=5 * pq.ms)
                 # measure runtime for one buffer
                 tic1 = perf_counter_ns()
-                opcc.calculate_pcc(binned_spike_buffer=binned_st)
+                opcc.update_pcc(binned_spike_buffer=binned_st)
                 toc1 = perf_counter_ns()
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
