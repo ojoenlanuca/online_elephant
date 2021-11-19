@@ -10,6 +10,52 @@ from analysis import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
     OnlinePearsonCorrelationCoefficient
 
 
+def create_benchmark_plot(parameter_values, run_times, parameter_name,
+                          method_name):
+    """
+    Creates the benchmark plots of a specified method (MFR, ISI, PCC) for
+    an investigated parameter (buffer size, firing rate, buffer count).
+
+    :param parameter_values: list
+        values of the investigated parameter
+    :param run_times: list
+        run time values for the investigated parameter
+    :param parameter_name: string
+        name of the parameter (format: "Xxxx_Yyyy")
+    :param method_name: string
+        name of the method as abbreviation (format: "ABC")
+    :return: None
+
+    """
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
+    fig.suptitle(f"{parameter_name.replace('_', ' ')} Influence on Run Time of"
+                 f" Online {method_name}", y=0.93, fontsize=18,
+                 fontweight="bold")
+    ax1.plot(parameter_values, run_times, label="average times per buffer",
+             marker="x", markerfacecolor="red", markeredgecolor='red')
+    ax1.hlines(np.mean(run_times), xmin=parameter_values[0],
+               xmax=parameter_values[-1], label="mean across buffer sizes",
+               colors="orange")
+    ax1.tick_params(axis='both', labelsize=14)
+    ax1.tick_params(axis='x', direction="in", pad=-22, )
+    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
+    ax1.yaxis.offsetText.set_visible(False)
+    ax1.figure.canvas.draw()
+    fmt = ax1.yaxis.get_major_formatter()
+    scale_factor = fmt.get_offset()
+    ax1.set_xlabel(f"{parameter_name.replace('_', ' ')} in sec", fontsize=16,
+                   fontweight="bold")
+    ax1.set_ylabel(f"Average Run Time in {scale_factor} sec", fontsize=16,
+                   fontweight="bold")
+    order_of_magnitude_of_ylim = float(f"1e{floor(log10(max(run_times)))}")
+    ax1.set_ylim(min(run_times) - order_of_magnitude_of_ylim,
+                 max(run_times) + order_of_magnitude_of_ylim)
+    ax1.legend(fontsize=16)
+    plt.savefig(f"plots/o{method_name.lower()}_investigate_"
+                f"{parameter_name.lower()}.pdf")
+    plt.show()
+
+
 class BenchmarkOnlineMeanFiringRate:
     def __init__(self, num_repetitions):
         self.num_repetitions = num_repetitions
@@ -51,32 +97,9 @@ def omfr_investigate_buffer_size():
     for b in buffer_sizes:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
             buffer_size=b, num_buffers=100, firing_rate=50))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Buffer size influence on runtime of online MFR", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(buffer_sizes, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=buffer_sizes[0],
-               xmax=buffer_sizes[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22, )
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("buffer size in sec", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/omfr_investigate_buffer_size.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=buffer_sizes,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Buffer_Size", method_name="MFR")
 
 
 def omfr_investigate_firing_rate():
@@ -86,32 +109,9 @@ def omfr_investigate_firing_rate():
     for f in firing_rates:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
             buffer_size=1, num_buffers=100, firing_rate=f))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Firing rate influence on runtime of online MFR", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(firing_rates, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=firing_rates[0],
-               xmax=firing_rates[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22, )
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("firing rate in Hz", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/omfr_investigate_firing_rate.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=firing_rates,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Firing_Rate", method_name="MFR")
 
 
 def omfr_investigate_number_of_buffers():
@@ -121,32 +121,9 @@ def omfr_investigate_number_of_buffers():
     for nb in num_buffers:
         average_times_per_buffer.append(bomfr.do_benchmark_omfr(
             buffer_size=1, num_buffers=nb, firing_rate=50))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Buffer count influence on runtime of online MFR", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(num_buffers, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=num_buffers[0],
-               xmax=num_buffers[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("number of buffers", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/omfr_investigate_number_of_buffers.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=num_buffers,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Buffer_Count", method_name="MFR")
 
 
 class BenchmarkOnlineInterSpikeInterval:
@@ -190,32 +167,9 @@ def oisi_investigate_buffer_size():
     for b in buffer_sizes:
         average_times_per_buffer.append(boisi.do_benchmark_oisi(
             buffer_size=b, num_buffers=100, firing_rate=50))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Buffer size influence on runtime of online ISI", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(buffer_sizes, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=buffer_sizes[0],
-               xmax=buffer_sizes[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("buffer size in sec", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/oisi_investigate_buffer_size.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=buffer_sizes,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Buffer_Size", method_name="ISI")
 
 
 def oisi_investigate_firing_rate():
@@ -225,32 +179,9 @@ def oisi_investigate_firing_rate():
     for f in firing_rates:
         average_times_per_buffer.append(boisi.do_benchmark_oisi(
             buffer_size=1, num_buffers=100, firing_rate=f))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Firing Rate influence on runtime of online ISI", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(firing_rates, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=firing_rates[0],
-               xmax=firing_rates[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("firing rate in Hz", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/oisi_investigate_firing_rate.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=firing_rates,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Firing_Rate", method_name="ISI")
 
 
 def oisi_investigate_number_of_buffers():
@@ -260,32 +191,9 @@ def oisi_investigate_number_of_buffers():
     for nb in num_buffers:
         average_times_per_buffer.append(boisi.do_benchmark_oisi(
             buffer_size=1, num_buffers=nb, firing_rate=50))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Buffer count influence on runtime of online ISI", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(num_buffers, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=num_buffers[0],
-               xmax=num_buffers[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("number of buffers", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/oisi_investigate_number_of_buffers.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=num_buffers,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Buffer_Count", method_name="ISI")
 
 
 class BenchmarkOnlinePearsonCorrelationCoefficient:
@@ -333,32 +241,9 @@ def opcc_investigate_buffer_size():
     for b in buffer_sizes:
         average_times_per_buffer.append(bopcc.do_benchmark_opcc(
             buffer_size=b, num_buffers=100, firing_rate=50))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Buffer size influence on runtime of online PCC", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(buffer_sizes, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=buffer_sizes[0],
-               xmax=buffer_sizes[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("buffer size in sec", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/opcc_investigate_buffer_size.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=buffer_sizes,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Buffer_Size", method_name="PCC")
 
 
 def opcc_investigate_firing_rate():
@@ -368,32 +253,9 @@ def opcc_investigate_firing_rate():
     for f in firing_rates:
         average_times_per_buffer.append(bopcc.do_benchmark_opcc(
             buffer_size=1, num_buffers=100, firing_rate=f))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Firing rate influence on runtime of online PCC", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(firing_rates, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=firing_rates[0],
-               xmax=firing_rates[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("firing rate in Hz", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/opcc_investigate_firing_rate.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=firing_rates,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Firing_Rate", method_name="PCC")
 
 
 def opcc_investigate_number_of_buffers():
@@ -403,32 +265,9 @@ def opcc_investigate_number_of_buffers():
     for nb in num_buffers:
         average_times_per_buffer.append(bopcc.do_benchmark_opcc(
             buffer_size=1, num_buffers=nb, firing_rate=50))
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
-    fig.suptitle("Buffer count influence on runtime of online PCC", y=0.93,
-                 fontsize=18, fontweight="bold")
-    ax1.plot(num_buffers, average_times_per_buffer,
-             label="average times per buffer", marker="x",
-             markerfacecolor="red", markeredgecolor='red')
-    ax1.hlines(np.mean(average_times_per_buffer), xmin=num_buffers[0],
-               xmax=num_buffers[-1], label="mean across buffer sizes",
-               colors="orange")
-    ax1.tick_params(axis='both', labelsize=14)
-    ax1.tick_params(axis='x', direction="in", pad=-22)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel("number of buffers", fontsize=16, fontweight="bold")
-    ax1.set_ylabel(f"average runtime in {scale_factor} sec", fontsize=16,
-                   fontweight="bold")
-    order_of_magnitude_of_ylim = \
-        float(f"1e{floor(log10(max(average_times_per_buffer)))}")
-    ax1.set_ylim(min(average_times_per_buffer)-order_of_magnitude_of_ylim,
-                 max(average_times_per_buffer)+order_of_magnitude_of_ylim)
-    ax1.legend(fontsize=16)
-    plt.savefig("plots/opcc_investigate_number_of_buffers.svg")
-    plt.show()
+    create_benchmark_plot(parameter_values=num_buffers,
+                          run_times=average_times_per_buffer,
+                          parameter_name="Buffer_Count", method_name="PCC")
 
 
 if __name__ == '__main__':
