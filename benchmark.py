@@ -6,7 +6,7 @@ import quantities as pq
 from elephant.conversion import BinnedSpikeTrain
 from elephant.spike_train_generation import homogeneous_poisson_process
 
-from analysis import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
+from online_statistics import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
     OnlinePearsonCorrelationCoefficient
 
 

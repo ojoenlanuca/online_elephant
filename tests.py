@@ -9,7 +9,7 @@ from elephant.spike_train_correlation import correlation_coefficient
 from elephant.spike_train_generation import homogeneous_poisson_process
 from elephant.statistics import mean_firing_rate, isi
 
-from analysis import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
+from online_statistics import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
     OnlinePearsonCorrelationCoefficient
 
 
