@@ -6,14 +6,14 @@ from elephant.statistics import mean_firing_rate, isi
 
 class OnlineMeanFiringRate:
     def __init__(self):
-        self._unit = 1 * pq.Hz
+        self.unit = 1 * pq.Hz
         self._current_mfr = 0  # in  Hz
-        self._buffer_counter = 0
-        self._buffer_size = 1   # in sec
+        self.buffer_counter = 0
+        self.buffer_size = 1   # in sec
 
     @property
     def current_mfr(self):
-        return self._current_mfr * self._unit
+        return self._current_mfr * self.unit
 
     def update_mfr(self, spike_buffer):
         """
@@ -33,18 +33,18 @@ class OnlineMeanFiringRate:
         else:
             if isinstance(spike_buffer, neo.SpikeTrain):
                 buffer_mfr = mean_firing_rate(spike_buffer).rescale(
-                    self._unit).magnitude
+                    self.unit).magnitude
             if isinstance(spike_buffer, np.ndarray) and \
                     not isinstance(spike_buffer, neo.SpikeTrain):
                 buffer_mfr = mean_firing_rate(
-                    spike_buffer, t_start=self._buffer_counter *
-                                          self._buffer_size,
-                    t_stop=self._buffer_counter * self._buffer_size +
-                           self._buffer_size)
-        self._buffer_counter += 1
+                    spike_buffer, t_start=self.buffer_counter *
+                                          self.buffer_size,
+                    t_stop=self.buffer_counter * self.buffer_size +
+                           self.buffer_size)
+        self.buffer_counter += 1
         self._current_mfr += \
-            (buffer_mfr - self._current_mfr) / self._buffer_counter
-        return self._current_mfr * self._unit
+            (buffer_mfr - self._current_mfr) / self.buffer_counter
+        return self._current_mfr * self.unit
 
 
 class OnlineInterSpikeInterval:
