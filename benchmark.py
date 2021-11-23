@@ -138,7 +138,7 @@ def omfr_investigate_number_of_buffers():
     for nb in num_buffers:
         mean, std = bomfr.do_benchmark_omfr(buffer_size=1, num_buffers=nb,
                                             firing_rate=50)
-        average_times_per_buffer.append()
+        average_times_per_buffer.append(mean)
         std_of_runtimes_per_buffer.append(std)
     create_benchmark_plot(
         parameter_values=num_buffers, run_times=average_times_per_buffer,
