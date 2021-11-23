@@ -50,35 +50,27 @@ class OnlineMeanFiringRate:
 
 
 class OnlineInterSpikeInterval:
-    def __init__(self):
+    def __init__(self, bin_size=0.0005):
         self.buffer_size = 1  # in sec
         self.last_spike_time = None
-        self.current_isi = []  # in sec
-        self.bin_size = 0.0005  # in sec
-        self.bins_edges = np.asarray([self.bin_size * i
-                                      for i in range(int(self.buffer_size / self.bin_size))])
-        self.current_isi_histogram = np.empty(shape=(len(self.bins_edges)-1))
+        self.bin_size = bin_size  # in sec
+        self.bin_edges = np.asarray([self.bin_size * i
+                                     for i in range(int(1 / self.bin_size))])
+        self.current_isi_histogram = np.empty(shape=(len(self.bin_edges) - 1))
 
-    def update_isi(self, spike_buffer, mode="raw"):
+    def update_isi(self, spike_buffer):
         """
         Calculates the inter-spike interval of a single neuron.
 
         :param spike_buffer: neo.Spiketrain or np.ndarray
             contains the spiketimes of one neuron
-        :param mode: "raw" or "histogram"
-            ISI values are either returned as list or histogram with bin_edges
         :return
-            - self.current_isi: list, if mode="raw"
-            list of all ISI values of one neuron, which were calculated
-            until now (unit: sec)
-            - self.current_isi_histogram, self.bin_edges: both numpy.ndarray,
-                if mode="histogram"
-            histogram of the current ISI values according to the defined
-            bin_edges
+            self.current_isi_histogram: numpy.ndarray,
+                histogram of the current ISI values according to the defined
+                bin_edges
 
         Notes:
-        if spike_buffer is empty, nothing will change and therefore nothing will
-        be returned
+        if spike_buffer is empty, an unchanged histogram will be returned
 
         """
         if spike_buffer.size is not 0:  # case1: spike_buffer not empty
@@ -89,19 +81,11 @@ class OnlineInterSpikeInterval:
             else:  # for first buffer
                 buffer_isi = isi(spike_buffer)
             self.last_spike_time = spike_buffer[-1]
-            if mode == "raw":
-                if isinstance(spike_buffer, neo.SpikeTrain):
-                    self.current_isi.extend(buffer_isi.magnitude.tolist())
-                if isinstance(spike_buffer, np.ndarray) \
-                        and not isinstance(spike_buffer, neo.SpikeTrain):
-                    self.current_isi.extend(buffer_isi.tolist())
-                return self.current_isi
-            elif mode == "histogram":
-                buffer_hist, _ = np.histogram(buffer_isi, bins=self.bins_edges)
-                self.current_isi_histogram += buffer_hist
-                return self.current_isi_histogram
+            buffer_hist, _ = np.histogram(buffer_isi, bins=self.bin_edges)
+            self.current_isi_histogram += buffer_hist
+            return self.current_isi_histogram
         else:  # case2: spike_buffer is empty
-            pass
+            return self.current_isi_histogram
 
 
 class OnlinePearsonCorrelationCoefficient:

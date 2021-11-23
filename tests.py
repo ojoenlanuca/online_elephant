@@ -99,7 +99,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
 
     def test_correctness_multiple_neurons(self):
         """Test, if results of online and normal inter-spike interval
-        function are identical multiple neurons."""
+        function are identical for multiple neurons."""
         # create list of spiketrain lists
         list_of_st_lists = [[homogeneous_poisson_process(
             50*pq.Hz, t_start=self.buff_size*i*pq.s,
@@ -115,7 +115,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
                 oisi_all_neurons_neo[j].update_isi(spike_buffer=st)
-        final_online_isi_neo = [oisi_all_neurons_neo[j].current_isi
+        final_online_isi_histogram_neo = [oisi_all_neurons_neo[j].current_isi_histogram
                                 for j in range(self.num_neurons)]
         toc1_neo = perf_counter_ns()
         # for np.ndarray input
@@ -125,7 +125,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         for j, st_list in enumerate(list_of_st_lists):
             for st in st_list:
                 oisi_all_neurons_np[j].update_isi(spike_buffer=st.magnitude)
-        final_online_isi_np = [oisi_all_neurons_np[j].current_isi
+        final_online_isi_histogram_np = [oisi_all_neurons_np[j].current_isi_histogram
                                for j in range(self.num_neurons)]
         toc1_np = perf_counter_ns()
 
@@ -140,6 +140,14 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
         tic2 = perf_counter_ns()
         normal_isi = [isi(concatenated_st[j]).magnitude.tolist()
                       for j in range(self.num_neurons)]
+        # create histogram of ISI values
+        bin_size = 0.0005  # in sec
+        bin_edges = np.asarray([bin_size * i
+                                for i in range(int(1 / bin_size))])
+        normal_isi_histogram = []
+        for j in range(self.num_neurons):
+            histogram, _ = np.histogram(normal_isi[j], bins=bin_edges)
+            normal_isi_histogram.append(histogram)
         toc2 = perf_counter_ns()
 
         # compare results of normal isi and online isi
@@ -149,7 +157,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
                   f"(t_online_neo/t_normal)={(toc1_neo-tic1_neo)/(toc2-tic2)}")
             for j in range(self.num_neurons):
                 np.testing.assert_allclose(
-                    final_online_isi_neo[j], normal_isi[j],
+                    final_online_isi_histogram_neo[j], normal_isi_histogram[j],
                     rtol=self.rtol, atol=self.atol)
         with self.subTest(msg="np.ndarray input"):
             print(f"online_isi:  | run-time: {(toc1_np-tic1_np)*1e-9}sec\n"
@@ -157,7 +165,7 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
                   f"(t_online_np/t_normal)={(toc1_np-tic1_np)/(toc2-tic2)}")
             for j in range(self.num_neurons):
                 np.testing.assert_allclose(
-                    final_online_isi_np[j], normal_isi[j],
+                    final_online_isi_histogram_np[j], normal_isi_histogram[j],
                     rtol=self.rtol, atol=self.atol)
 
 
