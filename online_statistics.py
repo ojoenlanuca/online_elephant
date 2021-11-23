@@ -1,8 +1,9 @@
+from math import ceil
+
 import neo
 import numpy as np
 import quantities as pq
 from elephant.statistics import mean_firing_rate, isi
-from math import ceil
 
 
 class OnlineMeanFiringRate:
