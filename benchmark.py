@@ -12,7 +12,7 @@ from online_statistics import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
 
 def create_benchmark_plot(parameter_values, run_times, parameter_name,
                           method_name, panel_label, xaxis_unit,
-                          std_of_runtimes_per_buffer):
+                          std_error):
     """
     Creates the benchmark plots of a specified method (MFR, ISI, PCC) for
     an investigated parameter (buffer size, firing rate, buffer count).
@@ -30,8 +30,8 @@ def create_benchmark_plot(parameter_values, run_times, parameter_name,
         SI-Unit of the x-axis (e.g. 's', 'Hz')
     :param panel_label:
         label of the panel (e.g. 'A', 'B', 'C')
-    :param std_of_runtimes_per_buffer: list of floats
-        list of standard deviation values of the runtimes per buffer
+    :param std_error: list of floats
+        list of standard error values of the runtimes per buffer
 
     :return: None
 
@@ -39,7 +39,7 @@ def create_benchmark_plot(parameter_values, run_times, parameter_name,
     fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
     fig.suptitle(f"{parameter_name.replace('_', ' ')} Influence on Run Time of"
                  f" Online {method_name}", y=0.93, fontsize=18)
-    ax1.errorbar(parameter_values, run_times, yerr=std_of_runtimes_per_buffer,
+    ax1.errorbar(parameter_values, run_times, yerr=std_error,
                  ecolor='red', label="average times per buffer",
                  marker="o", markerfacecolor="black", markeredgecolor='black')
     ax1.text(-0.07, 1.07, panel_label, transform=ax1.transAxes,
@@ -85,65 +85,66 @@ class BenchmarkOnlineMeanFiringRate:
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
             # add sum of buffer_runtimes to repetition_runtime list
-            repetition_runtimes_per_buffer.append(sum(buffer_runtimes)
-                                                  / num_buffers)
+            repetition_runtimes_per_buffer.append(
+                sum(buffer_runtimes) / num_buffers)
 
-        # calculate average runtime per buffer and standard deviation
+        # calculate average runtime per buffer and standard error
         mean_runtime_per_buffer = np.mean(repetition_runtimes_per_buffer)
-        std_of_runtimes_per_buffer = np.std(repetition_runtimes_per_buffer)
+        std_error_of_runtimes_per_buffer = \
+            np.std(repetition_runtimes_per_buffer)/np.sqrt(self.num_repetitions)
         print(f"average runtime per buffer for online_mfr: "
               f"{mean_runtime_per_buffer}sec\n"
               f"-> with buffer_size={buffer_size}, firing_rate={firing_rate}, "
               f"number of buffers={num_buffers}")
-        return mean_runtime_per_buffer, std_of_runtimes_per_buffer
+        return mean_runtime_per_buffer, std_error_of_runtimes_per_buffer
 
 
 def omfr_investigate_buffer_size():
     buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=100)
     for b in buffer_sizes:
-        mean, std = bomfr.do_benchmark_omfr(buffer_size=b, num_buffers=100,
-                                            firing_rate=50)
+        mean, std_error = bomfr.do_benchmark_omfr(
+            buffer_size=b, num_buffers=100, firing_rate=50)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=buffer_sizes, run_times=average_times_per_buffer,
         parameter_name="Buffer_Size", method_name="MFR", panel_label="A",
-        xaxis_unit="s", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="s", std_error=std_error_of_runtimes_per_buffer)
 
 
 def omfr_investigate_firing_rate():
     firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=100)
     for f in firing_rates:
-        mean, std = bomfr.do_benchmark_omfr(buffer_size=1, num_buffers=100,
-                                            firing_rate=f)
+        mean, std_error = bomfr.do_benchmark_omfr(
+            buffer_size=1, num_buffers=100, firing_rate=f)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=firing_rates, run_times=average_times_per_buffer,
         parameter_name="Firing_Rate", method_name="MFR", panel_label="B",
-        xaxis_unit="Hz", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="Hz", std_error=std_error_of_runtimes_per_buffer)
 
 
 def omfr_investigate_number_of_buffers():
     num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     bomfr = BenchmarkOnlineMeanFiringRate(num_repetitions=100)
     for nb in num_buffers:
-        mean, std = bomfr.do_benchmark_omfr(buffer_size=1, num_buffers=nb,
-                                            firing_rate=50)
+        mean, std_error = bomfr.do_benchmark_omfr(
+            buffer_size=1, num_buffers=nb, firing_rate=50)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=num_buffers, run_times=average_times_per_buffer,
         parameter_name="Buffer_Count", method_name="MFR", panel_label="C",
-        xaxis_unit="", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="", std_error=std_error_of_runtimes_per_buffer)
 
 
 class BenchmarkOnlineInterSpikeInterval:
@@ -164,71 +165,71 @@ class BenchmarkOnlineInterSpikeInterval:
                     t_stop=(buffer_size*i+buffer_size)*pq.s)
                 # measure runtime for one buffer
                 tic1 = perf_counter_ns()
-                oisi.update_isi(spike_buffer=st, mode="histogram")
+                oisi.update_isi(spike_buffer=st)
                 toc1 = perf_counter_ns()
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
             # add sum of buffer_runtimes to repetition_runtimes list
-            repetition_runtimes_per_buffer.append(sum(buffer_runtimes)
-                                                  / num_buffers)
+            repetition_runtimes_per_buffer.append(
+                sum(buffer_runtimes) / num_buffers)
 
-        # calculate average runtime per buffer and standard deviation
+        # calculate average runtime per buffer and standard error
         mean_runtime_per_buffer = np.mean(repetition_runtimes_per_buffer)
-        std_of_runtimes_per_buffer = np.std(repetition_runtimes_per_buffer)
-
+        std_error_of_runtimes_per_buffer = \
+            np.std(repetition_runtimes_per_buffer)/np.sqrt(self.num_repetitions)
         print(f"average runtime per buffer for online_isi: "
               f"{mean_runtime_per_buffer}sec\n"
               f"-> with buffer_size={buffer_size}, firing_rate={firing_rate}, "
               f"number of buffers={num_buffers}")
-        return mean_runtime_per_buffer, std_of_runtimes_per_buffer
+        return mean_runtime_per_buffer, std_error_of_runtimes_per_buffer
 
 
 def oisi_investigate_buffer_size():
     buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=100)
     for b in buffer_sizes:
-        mean, std = boisi.do_benchmark_oisi(buffer_size=b, num_buffers=100,
-                                            firing_rate=50)
+        mean, std_error = boisi.do_benchmark_oisi(
+            buffer_size=b, num_buffers=100, firing_rate=50)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=buffer_sizes, run_times=average_times_per_buffer,
         parameter_name="Buffer_Size", method_name="ISI", panel_label="A",
-        xaxis_unit="s", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="s", std_error=std_error_of_runtimes_per_buffer)
 
 
 def oisi_investigate_firing_rate():
     firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=100)
     for f in firing_rates:
-        mean, std = boisi.do_benchmark_oisi(buffer_size=1, num_buffers=100,
-                                            firing_rate=f)
+        mean, std_error = boisi.do_benchmark_oisi(
+            buffer_size=1, num_buffers=100, firing_rate=f)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=firing_rates, run_times=average_times_per_buffer,
         parameter_name="Firing_Rate", method_name="ISI", panel_label="B",
-        xaxis_unit="Hz", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="Hz", std_error=std_error_of_runtimes_per_buffer)
 
 
 def oisi_investigate_number_of_buffers():
     num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     boisi = BenchmarkOnlineInterSpikeInterval(num_repetitions=100)
     for nb in num_buffers:
-        mean, std = boisi.do_benchmark_oisi(buffer_size=1, num_buffers=nb,
-                                            firing_rate=50)
+        mean, std_error = boisi.do_benchmark_oisi(
+            buffer_size=1, num_buffers=nb, firing_rate=50)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=num_buffers, run_times=average_times_per_buffer,
         parameter_name="Buffer_Count", method_name="ISI", panel_label="C",
-        xaxis_unit="", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="", std_error=std_error_of_runtimes_per_buffer)
 
 
 class BenchmarkOnlinePearsonCorrelationCoefficient:
@@ -257,66 +258,66 @@ class BenchmarkOnlinePearsonCorrelationCoefficient:
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
             # add sum of buffer_runtimes to repetition_runtimes list
-            repetition_runtimes_per_buffer.append(sum(buffer_runtimes)
-                                                  / num_buffers)
+            repetition_runtimes_per_buffer.append(
+                sum(buffer_runtimes) / num_buffers)
 
-        # calculate average runtime per buffer and standard deviation
+        # calculate average runtime per buffer and standard error
         mean_runtime_per_buffer = np.mean(repetition_runtimes_per_buffer)
-        std_of_runtimes_per_buffer = np.std(repetition_runtimes_per_buffer)
-
+        std_error_of_runtimes_per_buffer = \
+            np.std(repetition_runtimes_per_buffer)/np.sqrt(self.num_repetitions)
         print(f"average runtime per buffer for online_pcc: "
               f"{mean_runtime_per_buffer}sec\n"
               f"-> with buffer_size={buffer_size}, firing_rate={firing_rate}, "
               f"number of buffers={num_buffers}")
-        return mean_runtime_per_buffer, std_of_runtimes_per_buffer
+        return mean_runtime_per_buffer, std_error_of_runtimes_per_buffer
 
 
 def opcc_investigate_buffer_size():
     buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=100)
     for b in buffer_sizes:
-        mean, std = bopcc.do_benchmark_opcc(buffer_size=b, num_buffers=100,
-                                            firing_rate=50)
+        mean, std_error = bopcc.do_benchmark_opcc(
+            buffer_size=b, num_buffers=100, firing_rate=50)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=buffer_sizes, run_times=average_times_per_buffer,
         parameter_name="Buffer_Size", method_name="PCC", panel_label="A",
-        xaxis_unit="s", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="s", std_error=std_error_of_runtimes_per_buffer)
 
 
 def opcc_investigate_firing_rate():
     firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=100)
     for f in firing_rates:
-        mean, std = bopcc.do_benchmark_opcc(buffer_size=1, num_buffers=100,
-                                            firing_rate=f)
+        mean, std_error = bopcc.do_benchmark_opcc(
+            buffer_size=1, num_buffers=100, firing_rate=f)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=firing_rates, run_times=average_times_per_buffer,
         parameter_name="Firing_Rate", method_name="PCC", panel_label="B",
-        xaxis_unit="Hz", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="Hz", std_error=std_error_of_runtimes_per_buffer)
 
 
 def opcc_investigate_number_of_buffers():
     num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    std_of_runtimes_per_buffer = []
+    std_error_of_runtimes_per_buffer = []
     bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=100)
     for nb in num_buffers:
-        mean, std = bopcc.do_benchmark_opcc(buffer_size=1, num_buffers=nb,
-                                            firing_rate=50)
+        mean, std_error = bopcc.do_benchmark_opcc(
+            buffer_size=1, num_buffers=nb, firing_rate=50)
         average_times_per_buffer.append(mean)
-        std_of_runtimes_per_buffer.append(std)
+        std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=num_buffers, run_times=average_times_per_buffer,
         parameter_name="Buffer_Count", method_name="PCC", panel_label="C",
-        xaxis_unit="", std_of_runtimes_per_buffer=std_of_runtimes_per_buffer)
+        xaxis_unit="", std_error=std_error_of_runtimes_per_buffer)
 
 
 if __name__ == '__main__':
