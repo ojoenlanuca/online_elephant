@@ -70,7 +70,7 @@ def create_benchmark_plot(parameter_values, run_times, parameter_name,
     lines2, labels2 = ax2.get_legend_handles_labels()
     plt.legend(lines1 + lines2, labels1 + labels2, fontsize=16)
     plt.savefig(f"plots/o{method_name.lower()}_investigate_"
-                f"{parameter_name.lower()}_twin_yaxis.pdf")
+                f"{parameter_name.lower()}.pdf")
     plt.show()
 
 
