@@ -2,6 +2,7 @@ import neo
 import numpy as np
 import quantities as pq
 from elephant.statistics import mean_firing_rate, isi
+from math import ceil
 
 
 class OnlineMeanFiringRate:
@@ -103,7 +104,9 @@ class OnlineInterSpikeInterval:
 
 
 class OnlinePearsonCorrelationCoefficient:
-    def __init__(self):
+    def __init__(self, buffer_size=1):
+        self.bin_size = 0.005  # in sec
+        self.buffer_size = buffer_size  # in sec
         self.buffer_counter = 0
         self.x_bar = 0  # mean spikes per bin
         self.y_bar = 0  # mean spikes per bin
@@ -112,13 +115,14 @@ class OnlinePearsonCorrelationCoefficient:
         self.C_s = 0  # sum_i=1_to_n (x_i - x_bar)(y_i - y_bar)
         self.R_xy = 0  # C_s / (sqrt(M_x) * sqrt(M_y))
 
-    def update_pcc(self, binned_spike_buffer):
+    def update_pcc(self, spike_buffer1, spike_buffer2):
         """
         Calculates Pearson's Correlation Coefficient between two neurons.
 
-        :param binned_spike_buffer: elephant.conversion.BinnedSpikeTrain
-            contains one binned spiketrain for each neuron of user defined
-            binsize
+        :param spike_buffer1: numpy.ndarray
+            contains spike times for first neuron
+        :param spike_buffer2: numpy.ndarray
+            contains spike times for second neuron
         :return self.R_xy: float
             Pearson's correlation coefficient of two neurons, range: [-1, 1]
 
@@ -140,13 +144,19 @@ class OnlinePearsonCorrelationCoefficient:
         Electronic Circuits Systems (DDECS), 184–89, 2017.
         https://doi.org/10.1109/DDECS.2017.7934563.
         """
-        # spike count per bin per neuron
-        spike_count_array = binned_spike_buffer.to_array()
-        for b in range(binned_spike_buffer.num_bins):
-            x_n_plus_1 = spike_count_array[0][b]
-            y_n_plus_1 = spike_count_array[1][b]
+        # create binned spike trains according to bin edges
+        num_bins = ceil(int(self.buffer_size/self.bin_size))
+        bin_edges = np.linspace(start=self.buffer_counter * self.buffer_size,
+                                stop=self.buffer_counter * self.buffer_size +
+                                     self.buffer_size, num=num_bins+1)
+        binned_st1, _ = np.histogram(a=spike_buffer1, bins=bin_edges)
+        binned_st2, _ = np.histogram(a=spike_buffer2, bins=bin_edges)
+        # loop over bins and calculate update
+        for b in range(num_bins):
+            x_n_plus_1 = binned_st1[b]
+            y_n_plus_1 = binned_st2[b]
             # n = number of bins in total considering all buffers
-            n = self.buffer_counter * binned_spike_buffer.num_bins + b
+            n = self.buffer_counter * num_bins + b
             self.C_s += n / (n + 1) * (x_n_plus_1 - self.x_bar) * \
                             (y_n_plus_1 - self.y_bar)
             x_bar_new = self.x_bar + (x_n_plus_1 - self.x_bar) / (n + 1)

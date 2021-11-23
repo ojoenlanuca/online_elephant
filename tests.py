@@ -16,7 +16,6 @@ from online_statistics import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
 class TestOnlineMeanFiringRate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        np.random.seed(73)
         cls.rtol = 1e-15
         cls.atol = 1e-15
         cls.num_neurons = 10
@@ -92,7 +91,6 @@ class TestOnlineMeanFiringRate(unittest.TestCase):
 class TestOnlineInterSpikeInterval(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        np.random.seed(73)
         cls.rtol = 1e-15
         cls.atol = 1e-15
         cls.num_neurons = 10
@@ -166,7 +164,6 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
 class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # np.random.seed(73)
         cls.rtol = 1e-15
         cls.atol = 1e-15
         cls.num_neurons = 10
@@ -186,7 +183,7 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
         # call calculate_pcc()
         opcc_neuron_pair1 = OnlinePearsonCorrelationCoefficient()
         tic1 = perf_counter_ns()
-        opcc_neuron_pair1.update_pcc(binned_spike_buffer=binned_st)
+        opcc_neuron_pair1.update_pcc(spike_buffer1=st1, spike_buffer2=st2)
         toc1 = perf_counter_ns()
         final_online_pcc = opcc_neuron_pair1.R_xy
 
@@ -223,8 +220,9 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
         # i.e. loop over binned spiketrain list and call calculate_pcc()
         opcc_neuron_pair1 = OnlinePearsonCorrelationCoefficient()
         tic1 = perf_counter_ns()
-        for binned_st in binned_st_list:
-            opcc_neuron_pair1.update_pcc(binned_spike_buffer=binned_st)
+        for i in range(self.num_buffers):
+            opcc_neuron_pair1.update_pcc(spike_buffer1=st1_list[i],
+                                         spike_buffer2=st2_list[i])
         final_online_pcc = opcc_neuron_pair1.R_xy
         toc1 = perf_counter_ns()
 

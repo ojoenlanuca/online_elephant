@@ -205,7 +205,7 @@ class BenchmarkOnlinePearsonCorrelationCoefficient:
         for r in range(self.num_repetitions):
             # simulate buffered reading/transport of spiketrains,
             # i.e. create binned spiketrain and call calculate_pcc()
-            opcc = OnlinePearsonCorrelationCoefficient()
+            opcc = OnlinePearsonCorrelationCoefficient(buffer_size=buffer_size)
             buffer_runtimes = []
             for i in range(num_buffers):
                 # create BinnedSpiketrain from single spiketrains
@@ -215,10 +215,9 @@ class BenchmarkOnlinePearsonCorrelationCoefficient:
                 st2 = homogeneous_poisson_process(
                     firing_rate * pq.Hz, t_start=buffer_size * i * pq.s,
                     t_stop=(buffer_size * i + buffer_size) * pq.s)
-                binned_st = BinnedSpikeTrain([st1, st2], bin_size=5 * pq.ms)
                 # measure runtime for one buffer
                 tic1 = perf_counter_ns()
-                opcc.update_pcc(binned_spike_buffer=binned_st)
+                opcc.update_pcc(spike_buffer1=st1, spike_buffer2=st2)
                 toc1 = perf_counter_ns()
                 buffer_runtimes.append((toc1-tic1)*1e-9)
 
@@ -237,7 +236,7 @@ class BenchmarkOnlinePearsonCorrelationCoefficient:
 def opcc_investigate_buffer_size():
     buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]
     average_times_per_buffer = []
-    bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=10)
+    bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=100)
     for b in buffer_sizes:
         average_times_per_buffer.append(bopcc.do_benchmark_opcc(
             buffer_size=b, num_buffers=100, firing_rate=50))
@@ -249,7 +248,7 @@ def opcc_investigate_buffer_size():
 def opcc_investigate_firing_rate():
     firing_rates = [0.1, 0.5, 1, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=10)
+    bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=100)
     for f in firing_rates:
         average_times_per_buffer.append(bopcc.do_benchmark_opcc(
             buffer_size=1, num_buffers=100, firing_rate=f))
@@ -261,7 +260,7 @@ def opcc_investigate_firing_rate():
 def opcc_investigate_number_of_buffers():
     num_buffers = [2, 5, 10, 50, 100, 250, 500, 750, 1000]
     average_times_per_buffer = []
-    bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=10)
+    bopcc = BenchmarkOnlinePearsonCorrelationCoefficient(num_repetitions=100)
     for nb in num_buffers:
         average_times_per_buffer.append(bopcc.do_benchmark_opcc(
             buffer_size=1, num_buffers=nb, firing_rate=50))
