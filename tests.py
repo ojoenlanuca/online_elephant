@@ -142,8 +142,9 @@ class TestOnlineInterSpikeInterval(unittest.TestCase):
                       for j in range(self.num_neurons)]
         # create histogram of ISI values
         bin_size = 0.0005  # in sec
-        bin_edges = np.asarray([bin_size * i
-                                for i in range(int(1 / bin_size))])
+        max_isi_value = 1  # in sec
+        num_bins = int(max_isi_value / bin_size)
+        bin_edges = np.linspace(start=0, stop=max_isi_value, num=num_bins+1)
         normal_isi_histogram = []
         for j in range(self.num_neurons):
             histogram, _ = np.histogram(normal_isi[j], bins=bin_edges)
