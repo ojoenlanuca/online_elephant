@@ -57,7 +57,7 @@ class OnlineInterSpikeInterval:
         self.num_bins = int(self.max_isi_value / self.bin_size)
         self.bin_edges = np.linspace(start=0, stop=self.max_isi_value,
                                      num=self.num_bins+1)
-        self.current_isi_histogram = np.empty(shape=(len(self.bin_edges) - 1))
+        self.current_isi_histogram = np.zeros(shape=(len(self.bin_edges) - 1))
 
     def update_isi(self, spike_buffer):
         """
