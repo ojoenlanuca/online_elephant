@@ -7,11 +7,11 @@ from elephant.statistics import mean_firing_rate, isi
 
 
 class OnlineMeanFiringRate:
-    def __init__(self):
+    def __init__(self, buffer_size=1):
         self.unit = 1 * pq.Hz
         self._current_mfr = 0  # in  Hz
         self.buffer_counter = 0
-        self.buffer_size = 1   # in sec
+        self.buffer_size = buffer_size   # in sec
 
     @property
     def current_mfr(self):
@@ -50,12 +50,13 @@ class OnlineMeanFiringRate:
 
 
 class OnlineInterSpikeInterval:
-    def __init__(self, bin_size=0.0005):
-        self.buffer_size = 1  # in sec
+    def __init__(self, bin_size=0.0005, max_isi_value=1):
+        self.max_isi_value = max_isi_value  # in sec
         self.last_spike_time = None
         self.bin_size = bin_size  # in sec
-        self.bin_edges = np.asarray([self.bin_size * i
-                                     for i in range(int(1 / self.bin_size))])
+        self.num_bins = int(self.max_isi_value / self.bin_size)
+        self.bin_edges = np.linspace(start=0, stop=self.max_isi_value,
+                                     num=self.num_bins+1)
         self.current_isi_histogram = np.empty(shape=(len(self.bin_edges) - 1))
 
     def update_isi(self, spike_buffer):
@@ -89,8 +90,8 @@ class OnlineInterSpikeInterval:
 
 
 class OnlinePearsonCorrelationCoefficient:
-    def __init__(self, buffer_size=1):
-        self.bin_size = 0.005  # in sec
+    def __init__(self, buffer_size=1, bin_size=0.005):
+        self.bin_size = bin_size  # in sec
         self.buffer_size = buffer_size  # in sec
         self.buffer_counter = 0
         self.x_bar = 0  # mean spikes per bin
