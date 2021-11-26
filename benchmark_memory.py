@@ -32,7 +32,7 @@ def omfr_plot_memory_benchmark_for_instantiation(buffer_sizes, used_memory,
     plt.show()
 
 
-def omfr_benchmark_memory(num_repetitions=100):
+def omfr_benchmark_memory_at_instantiation(num_repetitions=100):
     buffer_sizes = [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 6, 8, 10]  # in s
     memory_for_instantiation = []
     for rep in range(num_repetitions):
@@ -56,5 +56,34 @@ def omfr_benchmark_memory(num_repetitions=100):
         std_error_memory=std_error_of_memory_for_instantiation)
 
 
+def omfr_trace_memory_usage_during_simulation(num_buffers=100, buffer_size=1,
+                                              firing_rate=50):
+    memory_usage = []
+    st_list = [homogeneous_poisson_process(
+                    firing_rate*pq.Hz, t_start=buffer_size*i*pq.s,
+                    t_stop=(buffer_size*i+buffer_size)*pq.s).magnitude
+               for i in range(num_buffers)]
+    tracemalloc.start()
+    omfr = OnlineMeanFiringRate()
+    for i in range(num_buffers):
+        omfr.update_mfr(spike_buffer=st_list[i])
+        snapshot = tracemalloc.take_snapshot()
+        filter_instantiation = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py", lineno=67)
+        filter_update = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py", lineno=69)
+        snapshot_filtered = snapshot.filter_traces(
+            filters=[filter_instantiation, filter_update])
+        filterd_stats = snapshot_filtered.statistics("lineno")
+        memory_usage.append((filterd_stats[0].size,
+                             filterd_stats[1].size))
+        print(f"================ SNAPSHOT{i} =================")
+        for stat in snapshot_filtered.statistics("lineno"):
+            print(stat)
+            print(memory_usage[i])
+    tracemalloc.stop()
+
+
 if __name__ == "__main__":
-    omfr_benchmark_memory()
+    # omfr_benchmark_memory_at_instantiation()
+    omfr_trace_memory_usage_during_simulation()
