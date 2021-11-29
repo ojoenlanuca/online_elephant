@@ -36,36 +36,41 @@ def create_benchmark_plot(parameter_values, run_times, parameter_name,
     :return: None
 
     """
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
+    fig, ax1 = plt.subplots(1, 1, figsize=(10, 6))
     fig.suptitle(f"{parameter_name.replace('_', ' ')} Influence on Run Time of"
                  f" Online {method_name}", y=0.93, fontsize=18)
-    ax1.errorbar(parameter_values, run_times, yerr=std_error, color="blue",
-                 ecolor='green', label="average times per buffer",
-                 marker="o", markerfacecolor="black", markeredgecolor='black')
-    # display number of neurons, which can be processed sequentially
-    # based on the average run times per buffer
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Number of Neurons', color='red', fontsize=16)
-    ax2.loglog(parameter_values, np.divide(buffer_size, run_times), color='red',
-             marker="o", markerfacecolor="black", markeredgecolor='black',
-             label="n_neurons per buffer")
-    ax2.tick_params(axis='y', labelcolor='red', labelsize=14)
-
+    # rescale runtimes to μs and accordingly rescale the respective std_error
+    run_times = np.multiply(run_times, 1e6)
+    std_error = np.multiply(std_error, 1e6)
+    ax1.errorbar(parameter_values, run_times, yerr=std_error, ecolor='red',
+                 marker="o", markerfacecolor="blue", markeredgecolor='black',
+                 color="blue", label="average times per buffer")
     ax1.text(-0.07, 1.07, panel_label, transform=ax1.transAxes,
              fontsize=30, fontweight='bold', va='top', ha='right')
     ax1.tick_params(axis='both', labelsize=14)
-    ax1.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    ax1.yaxis.offsetText.set_visible(False)
-    ax1.figure.canvas.draw()
-    fmt = ax1.yaxis.get_major_formatter()
-    scale_factor = fmt.get_offset()
-    ax1.set_xlabel(f"{parameter_name.replace('_', ' ')} [{xaxis_unit}]",
+    ax1.set_xlabel(f"{parameter_name.replace('_', ' ')} {xaxis_unit}",
                    fontsize=16)
-    ax1.set_ylabel(f"Average Run Time [{scale_factor}s]", color='blue',
-                   fontsize=16)
-    order_of_magnitude_of_ylim = float(f"1e{floor(log10(max(run_times)))}")
-    ax1.set_ylim(min(run_times) - order_of_magnitude_of_ylim,
-                 max(run_times) + order_of_magnitude_of_ylim)
+    ax1.set_ylabel(f"Average Run Time [μs]", color='blue', fontsize=16)
+    order_of_magnitude_of_y1_lim = float(f"1e{floor(log10(max(run_times)))}")
+    ax1.set_ylim(min(run_times)-order_of_magnitude_of_y1_lim,
+                 max(run_times)+order_of_magnitude_of_y1_lim)
+    # display estimated number of neurons, which can be processed sequentially
+    # based on the average run times per buffer
+    ax2 = ax1.twinx()
+    n_neurons_per_buffer = np.divide(buffer_size, np.multiply(run_times, 1e-6))
+    ax2.plot(parameter_values, n_neurons_per_buffer, color='orange',
+             marker="o", markerfacecolor="orange", markeredgecolor='black',
+             label="n_neurons")
+    ax2.tick_params(axis='y', labelcolor='orange', labelsize=14)
+    ax2.set_ylim(0,)
+    ax2.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
+    ax2.yaxis.offsetText.set_visible(False)
+    ax2.figure.canvas.draw()
+    fmt2 = ax2.yaxis.get_major_formatter()
+    scale_factor2 = fmt2.get_offset()
+    ax2.set_ylabel(f'Estimated Number of Neurons [{scale_factor2}]\n '
+                   f'sequentially processed within one buffer duration',
+                   color='orange', fontsize=16)
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     plt.legend(lines1 + lines2, labels1 + labels2, fontsize=16)
@@ -123,8 +128,8 @@ def omfr_investigate_buffer_size():
         std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=buffer_sizes, run_times=average_times_per_buffer,
-        parameter_name="Buffer_Size", method_name="MFR", panel_label="A",
-        xaxis_unit="s", std_error=std_error_of_runtimes_per_buffer,
+        parameter_name="Buffer_Duration", method_name="MFR", panel_label="A",
+        xaxis_unit="[s]", std_error=std_error_of_runtimes_per_buffer,
         buffer_size=buffer_sizes)
 
 
@@ -141,7 +146,7 @@ def omfr_investigate_firing_rate():
     create_benchmark_plot(
         parameter_values=firing_rates, run_times=average_times_per_buffer,
         parameter_name="Firing_Rate", method_name="MFR", panel_label="B",
-        xaxis_unit="Hz", std_error=std_error_of_runtimes_per_buffer,
+        xaxis_unit="[Hz]", std_error=std_error_of_runtimes_per_buffer,
         buffer_size=1)
 
 
@@ -211,8 +216,8 @@ def oisi_investigate_buffer_size():
         std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=buffer_sizes, run_times=average_times_per_buffer,
-        parameter_name="Buffer_Size", method_name="ISI", panel_label="A",
-        xaxis_unit="s", std_error=std_error_of_runtimes_per_buffer,
+        parameter_name="Buffer_Duration", method_name="ISI", panel_label="A",
+        xaxis_unit="[s]", std_error=std_error_of_runtimes_per_buffer,
         buffer_size=buffer_sizes)
 
 
@@ -229,7 +234,7 @@ def oisi_investigate_firing_rate():
     create_benchmark_plot(
         parameter_values=firing_rates, run_times=average_times_per_buffer,
         parameter_name="Firing_Rate", method_name="ISI", panel_label="B",
-        xaxis_unit="Hz", std_error=std_error_of_runtimes_per_buffer,
+        xaxis_unit="[Hz]", std_error=std_error_of_runtimes_per_buffer,
         buffer_size=1)
 
 
@@ -302,8 +307,8 @@ def opcc_investigate_buffer_size():
         std_error_of_runtimes_per_buffer.append(std_error)
     create_benchmark_plot(
         parameter_values=buffer_sizes, run_times=average_times_per_buffer,
-        parameter_name="Buffer_Size", method_name="PCC", panel_label="A",
-        xaxis_unit="s", std_error=std_error_of_runtimes_per_buffer,
+        parameter_name="Buffer_Duration", method_name="PCC", panel_label="A",
+        xaxis_unit="[s]", std_error=std_error_of_runtimes_per_buffer,
         buffer_size=buffer_sizes)
 
 
@@ -320,7 +325,7 @@ def opcc_investigate_firing_rate():
     create_benchmark_plot(
         parameter_values=firing_rates, run_times=average_times_per_buffer,
         parameter_name="Firing_Rate", method_name="PCC", panel_label="B",
-        xaxis_unit="Hz", std_error=std_error_of_runtimes_per_buffer,
+        xaxis_unit="[Hz]", std_error=std_error_of_runtimes_per_buffer,
         buffer_size=1)
 
 
