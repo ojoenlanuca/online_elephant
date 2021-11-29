@@ -56,34 +56,103 @@ def omfr_benchmark_memory_at_instantiation(num_repetitions=100):
         std_error_memory=std_error_of_memory_for_instantiation)
 
 
-def omfr_trace_memory_usage_during_simulation(num_buffers=100, buffer_size=1,
-                                              firing_rate=50):
-    memory_usage = []
+def trace_memory_usage_during_simulation_of_MFR_ISI_PCC(
+        num_buffers=100, buffer_size=1, firing_rate=50):
+    omfr_memory_usage = []
+    oisi_memory_usage = []
+    opcc_memory_usage = []
     st_list = [homogeneous_poisson_process(
                     firing_rate*pq.Hz, t_start=buffer_size*i*pq.s,
                     t_stop=(buffer_size*i+buffer_size)*pq.s).magnitude
                for i in range(num_buffers)]
     tracemalloc.start()
     omfr = OnlineMeanFiringRate()
+    oisi = OnlineInterSpikeInterval()
+    opcc = OnlinePearsonCorrelationCoefficient()
     for i in range(num_buffers):
         omfr.update_mfr(spike_buffer=st_list[i])
+        oisi.update_isi(spike_buffer=st_list[i])
+        opcc.update_pcc(spike_buffer1=st_list[i], spike_buffer2=st_list[i])
         snapshot = tracemalloc.take_snapshot()
-        filter_instantiation = tracemalloc.Filter(
-            inclusive=True, filename_pattern="*/benchmark_memory.py", lineno=67)
-        filter_update = tracemalloc.Filter(
-            inclusive=True, filename_pattern="*/benchmark_memory.py", lineno=69)
-        snapshot_filtered = snapshot.filter_traces(
-            filters=[filter_instantiation, filter_update])
-        filterd_stats = snapshot_filtered.statistics("lineno")
-        memory_usage.append((filterd_stats[0].size,
-                             filterd_stats[1].size))
-        print(f"================ SNAPSHOT{i} =================")
-        for stat in snapshot_filtered.statistics("lineno"):
-            print(stat)
-            print(memory_usage[i])
+        # filter OMFR trace
+        omfr_filter_instantiation = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py",
+            lineno=_get_line_number(omfr))
+        omfr_filter_update = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py",
+            lineno=_get_line_number(omfr)+4)
+        omfr_snapshot_filtered = snapshot.filter_traces(
+            filters=[omfr_filter_instantiation, omfr_filter_update])
+        omfr_filterd_stats = omfr_snapshot_filtered.statistics("lineno")
+        omfr_memory_usage.append((omfr_filterd_stats[0].size,
+                                  omfr_filterd_stats[1].size))
+        # filter OISI trace
+        oisi_filter_instantiation = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py",
+            lineno=_get_line_number(oisi))
+        oisi_filter_update = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py",
+            lineno=_get_line_number(oisi)+4)
+        oisi_snapshot_filtered = snapshot.filter_traces(
+            filters=[oisi_filter_instantiation, oisi_filter_update])
+        oisi_filterd_stats = oisi_snapshot_filtered.statistics("lineno")
+        oisi_memory_usage.append((oisi_filterd_stats[0].size,
+                                  oisi_filterd_stats[1].size))
+        # filter OPCC trace
+        opcc_filter_instantiation = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py",
+            lineno=_get_line_number(opcc))
+        opcc_filter_update = tracemalloc.Filter(
+            inclusive=True, filename_pattern="*/benchmark_memory.py",
+            lineno=_get_line_number(opcc)+4)
+        opcc_snapshot_filtered = snapshot.filter_traces(
+            filters=[opcc_filter_instantiation, opcc_filter_update])
+        opcc_filterd_stats = opcc_snapshot_filtered.statistics("lineno")
+        opcc_memory_usage.append((opcc_filterd_stats[0].size,
+                                  opcc_filterd_stats[1].size))
     tracemalloc.stop()
+
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
+    fig.suptitle(f"Memory Usage of Online MFR, ISI and PCC",
+                 y=0.93, fontsize=18)
+    # plot MFR memory usage results
+    ax1.plot(np.arange(0, num_buffers), np.asarray(omfr_memory_usage)[:, 0],
+             color="lightblue", marker="o", markerfacecolor="lightblue",
+             markeredgecolor='black', label="OMFR @ instance")
+    ax1.plot(np.arange(0, num_buffers), np.asarray(omfr_memory_usage)[:, 1],
+             color="blue", marker="o", markerfacecolor="blue",
+             markeredgecolor='black', label="OMFR @ update")
+    # plot ISI memory usage results
+    ax1.plot(np.arange(0, num_buffers), np.asarray(oisi_memory_usage)[:, 0],
+             color="lightcoral", marker="o", markerfacecolor="lightcoral",
+             markeredgecolor='black', label="OISI @ instance")
+    ax1.plot(np.arange(0, num_buffers), np.asarray(oisi_memory_usage)[:, 1],
+             color="red", marker="o", markerfacecolor="red",
+             markeredgecolor='black', label="OISI @ update")
+    # plot PCC memory usage results
+    ax1.plot(np.arange(0, num_buffers), np.asarray(opcc_memory_usage)[:, 0],
+             color="lightgreen", marker="o", markerfacecolor="lightgreen",
+             markeredgecolor='black', label="OPCC @ instance")
+    ax1.plot(np.arange(0, num_buffers), np.asarray(opcc_memory_usage)[:, 1],
+             color="green", marker="o", markerfacecolor="green",
+             markeredgecolor='black', label="OPCC @ update")
+
+    ax1.set_xlabel(f"Number of Buffers", fontsize=16)
+    ax1.set_ylabel(f"Memory Usage [Bytes]", fontsize=16)
+    plt.legend(fontsize=16)
+    plt.savefig(f"plots/trace_memory_usage_during_simulation_"
+                f"of_MFR_ISI_PCC.pdf")
+    plt.show()
+
+
+def _get_line_number(instance):
+    """Returns the line number of code, where an object instance was created /
+    it's used memory was allocated."""
+    location = tracemalloc.get_object_traceback(instance).format()
+    line_number = int(location[0].split(",")[1].split(" ")[2])
+    return line_number
 
 
 if __name__ == "__main__":
     # omfr_benchmark_memory_at_instantiation()
-    omfr_trace_memory_usage_during_simulation()
+    trace_memory_usage_during_simulation_of_MFR_ISI_PCC()
