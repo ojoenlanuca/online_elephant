@@ -1,20 +1,18 @@
 # Online Elephant 
 
-Adaption of statistical analysis methods from *Elephant*  to perform online 
-analysis within a corporative simulation during run-time.
+Adaption of statistical analysis methods from [Elephant](https://github.com/NeuralEnsemble/elephant) 
+to perform online analysis within a corporative simulation (a.k.a co-simulation) during run-time.
 
-## Planned Methods
+## Available Methods
 #### Correlations
-* Cross-correlation between neuron: -> is it possible to calculate for 100x100 
-neurons the approximately 10000 cross-correlation pairs 
-within one simulation time step? -> parallelization needed/sufficient?
-
+* Pearson Correlation Coefficient (PCC)
 #### Rate Estimation
-* Mean Firing Rate of Neurons
-* Instantaneous Rate of Neurons
+* Mean Firing Rate (MFR)
 #### Spike Interval Statistics
-* Inter-Spike-Intervall (ISI) of a spiketrain
-* (local) coefficient of variation
-#### Statistics across spike trains 
-* Fanofactor (probably unsuitable for online analysis, because it's a cross trial meassure)
-* Complexity / Probability Density (within trial should be possible & across trial probably unsuitable)
+* Inter-Spike-Interval (ISI) 
+
+## License
+"TODO: add License type", see [LICENSE.txt](LICENSE.txt) for details.
+
+## Copyright
+:copyright: 2021 by Maximilian Kramer.
