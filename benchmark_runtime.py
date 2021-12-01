@@ -63,7 +63,7 @@ def create_benchmark_plot(parameter_values, run_times, parameter_name,
              marker="o", markerfacecolor="green", markeredgecolor='black',
              label="number of neurons")
     ax2.tick_params(axis='y', labelcolor='green', labelsize=18)
-    ax2.set_ylim(0,)
+    ax2.set_ylim(0, max(n_neurons_per_buffer)*1.25)
     ax2.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
     ax2.yaxis.offsetText.set_visible(False)
     ax2.figure.canvas.draw()
