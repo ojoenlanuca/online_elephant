@@ -112,9 +112,9 @@ def trace_memory_usage_during_simulation_of_MFR_ISI_PCC(
                                   opcc_filterd_stats[1].size))
     tracemalloc.stop()
 
-    fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
+    fig, ax1 = plt.subplots(1, 1, figsize=(10, 6))
     fig.suptitle(f"Memory Usage of Online MFR, ISI and PCC",
-                 y=0.93, fontsize=18)
+                 y=0.93, fontsize=22)
     # plot MFR memory usage results
     ax1.plot(np.arange(0, num_buffers), np.asarray(omfr_memory_usage)[:, 0],
              color="lightblue", marker="o", markerfacecolor="lightblue",
@@ -137,9 +137,10 @@ def trace_memory_usage_during_simulation_of_MFR_ISI_PCC(
              color="green", marker="o", markerfacecolor="green",
              markeredgecolor='black', label="OPCC @ update")
 
-    ax1.set_xlabel(f"Number of Buffers", fontsize=16)
-    ax1.set_ylabel(f"Memory Usage [Bytes]", fontsize=16)
-    plt.legend(fontsize=16)
+    ax1.tick_params(axis='both', labelsize=18)
+    ax1.set_xlabel(f"Number of Buffers", fontsize=22)
+    ax1.set_ylabel(f"Memory Usage [Bytes]", fontsize=22)
+    plt.legend(fontsize=18)
     plt.savefig(f"plots/trace_memory_usage_during_simulation_"
                 f"of_MFR_ISI_PCC.pdf")
     plt.show()
