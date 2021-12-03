@@ -221,9 +221,6 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
             50*pq.Hz, t_start=self.buff_size*i*pq.s,
             t_stop=(self.buff_size*i+self.buff_size)*pq.s)
             for i in range(self.num_buffers)]
-        # create list of binned spiketrains
-        binned_st_list = [BinnedSpikeTrain([st1, st2], bin_size=5*pq.ms)
-                          for st1, st2 in zip(st1_list, st2_list)]
 
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over binned spiketrain list and call calculate_pcc()
