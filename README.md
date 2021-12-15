@@ -12,7 +12,7 @@ to perform online analysis within a corporative simulation (a.k.a co-simulation)
 * Inter-Spike-Interval (ISI) 
 
 ## License
-"TODO: add License type", see [LICENSE.txt](LICENSE.txt) for details.
+See [LICENSE.txt](LICENSE.txt) for details.
 
 ## Copyright
 :copyright: 2021 by Maximilian Kramer.
