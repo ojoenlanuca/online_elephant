@@ -1,16 +1,18 @@
 import unittest
-from time import perf_counter_ns
+from time import perf_counter_ns, sleep
 
 import neo
 import numpy as np
 import quantities as pq
+import matplotlib.pyplot as plt
 from elephant.conversion import BinnedSpikeTrain
 from elephant.spike_train_correlation import correlation_coefficient
 from elephant.spike_train_generation import homogeneous_poisson_process
+from elephant.unitary_event_analysis import jointJ_window_analysis
 from elephant.statistics import mean_firing_rate, isi
-
+import viziphant
 from online_statistics import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
-    OnlinePearsonCorrelationCoefficient
+    OnlinePearsonCorrelationCoefficient, OnlineUnitaryEventAnalysis
 
 
 class TestOnlineMeanFiringRate(unittest.TestCase):
@@ -258,6 +260,98 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
               f"PCC2: (t_online / t_normal)={(toc1-tic1)/(toc2-tic2)}\n")
         np.testing.assert_allclose(final_online_pcc, normal_pcc[0][1],
                                    rtol=self.rtol, atol=self.atol)
+
+
+def _generate_spiketrains(freq, length, ts_events, injection_pos):
+    """
+    Generate two spiketrains from an homogeneous Poisson process with
+    injected coincideces.
+    """
+    st1 = homogeneous_poisson_process(
+        rate=freq, t_start=0*pq.s, t_stop=length)
+    st2 = homogeneous_poisson_process(
+        rate=freq, t_start=0*pq.s, t_stop=length)
+    # inject 10 coincidences within a 0.1s interval for each trial
+    injection = np.linspace(0, 0.1, 10)*pq.s
+    all_injections = np.array([])
+    for i in ts_events:
+        all_injections = np.concatenate((all_injections, (i+injection_pos)+injection), axis=0)*pq.s
+    st1 = st1.duplicate_with_new_data(np.sort(np.concatenate((st1.times, all_injections)))*pq.s)
+    st2 = st2.duplicate_with_new_data(np.sort(np.concatenate((st2.times, all_injections)))*pq.s)
+
+    return st1, st2
+
+
+class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.rtol = 1e-15
+        cls.atol = 1e-15
+        cls.num_neurons = 10
+        cls.num_buffers = 100
+        cls.buff_size = 1  # in sec
+        np.random.seed(73)
+
+    def setUp(self):
+        pass
+
+    # test sensitivity (low FN rate) with injected coincidences
+    def test_sensitivity_with_injected_coincidences(self):
+        pass
+
+    # test selectivity (low FP rate) with injected coincidences
+    def test_selectivity_with_injected_coincidences(self):
+        pass
+
+    # test: trial window > in-coming data window    (TW > IDW)
+    def test_TW_larger_IDW(self):
+        """Test, if online UE analysis is correct when the trial window is
+        larger than the in-coming data window."""
+        n_trials = 40
+        TW_length = 1 * pq.s  # sec
+        IDW_length = 1 * pq.s  # sec
+        TS_events = np.arange(0.5, n_trials*2.5, 2.5)*pq.s  # 40 trials with 1s length and 1.5s background noise in between trials
+        # create two long random homogeneous poisson spiketrains
+        st1_long, st2_long = _generate_spiketrains(
+            freq=5*pq.Hz, length=IDW_length * self.num_buffers, ts_events=TS_events,
+            injection_pos=0.1*pq.s)
+        # stack spiketrains by trial
+        st1_stacked = [st1_long.time_slice(t_start=i-TW_length/2, t_stop=i+TW_length/2).time_shift(-i+TW_length/2) for i in TS_events]
+        st2_stacked = [st2_long.time_slice(t_start=i-TW_length/2, t_stop=i+TW_length/2).time_shift(-i+TW_length/2) for i in TS_events]
+
+        spiketrains = np.stack((st1_stacked, st2_stacked), axis=1)
+        ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms, win_size=100*pq.ms, win_step=5*pq.ms)
+        viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=ue_dict, significance_level=0.01, unit_real_ids=['1', '2'])
+        plt.show()
+
+        # simulate buffered reading/transport of spiketrains,
+        # i.e. loop over spiketrain list and call update_ue()
+        ouea = OnlineUnitaryEventAnalysis(
+            bw_size=0.005*pq.s, ew_pre_size=0.5*pq.s,
+            ew_post_size=0.5*pq.s, idw_size=IDW_length,
+            saw_size=0.1*pq.s, saw_step=0.005*pq.s,
+            mw_size=2.5*IDW_length, significance_level_alpha=0.05,
+            target_event=TS_events) # TODO: use one pyhsical unit as standard and rescale others accordingly
+        for i in range(self.num_buffers):
+            # sleep(1)
+            if i == 75:
+                print(f"step {i}")  # needed for debugging
+            ouea.update_uea(
+                spiketrains=[st1_long.time_slice(t_start=i*IDW_length,
+                                            t_stop=i*IDW_length+IDW_length),
+                             st2_long.time_slice(t_start=i*IDW_length,
+                                            t_stop=i*IDW_length+IDW_length)])
+            print(f"#buffer = {i}")
+        ue_dict_online = ouea.get_results()
+        ue_dict_online["input_parameters"]["t_stop"] += ue_dict_online["input_parameters"]["win_size"]  # compensates different win_pos definitions: center(online version) vs. left-edge(standard version)
+        viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=ue_dict_online, significance_level=0.01, unit_real_ids=['1', '2'])  # different num of win_pos in plot_ue causes error
+        plt.show()
+
+    # test: trial window = in-coming data window    (TW = IDW)
+    # test: trial window < in-coming data window    (TW < IDW)
+
+
+
 
 
 if __name__ == '__main__':
