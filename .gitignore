@@ -5,3 +5,8 @@ __pycache__/
 # plots & graphics
 plots
 .svg
+
+# data
+data
+.h5
+.nix
