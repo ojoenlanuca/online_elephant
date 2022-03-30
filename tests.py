@@ -1,6 +1,7 @@
 import unittest
 from time import perf_counter_ns, sleep
-
+import random
+import requests
 import neo
 import numpy as np
 import quantities as pq
@@ -304,9 +305,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         pass
 
     # test: trial window > in-coming data window    (TW > IDW)
-    def test_TW_larger_IDW(self):
+    def test_TW_larger_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
-        larger than the in-coming data window."""
+        larger than the in-coming data window with artifical data."""
         n_trials = 40
         TW_length = 1 * pq.s  # sec
         IDW_length = 1 * pq.s  # sec
@@ -347,11 +348,69 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=ue_dict_online, significance_level=0.01, unit_real_ids=['1', '2'])  # different num of win_pos in plot_ue causes error
         plt.show()
 
+    def test_TW_larger_IDW_real_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+                larger than the in-coming data window with real data."""
+        # Fix random seed to guarantee fixed output
+        random.seed(1224)
+
+        # load data and extract spiketrains
+        io = neo.io.NixIO("data/dataset-1.nix", 'ro')
+        block = io.read_block()
+        spiketrains = []
+        # each segment contains a single trial
+        for ind in range(len(block.segments)):
+            spiketrains.append(block.segments[ind].spiketrains)
+        # calculate Unitary Events
+        UE = jointJ_window_analysis(
+            spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
+            winstep=10 * pq.ms, pattern_hash=[3])
+        # plot results
+        viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=UE, significance_level=0.05, unit_real_ids=['1', '2'])
+        plt.show()
+
+        st0_long = [spiketrains[i].multiplexed[1][np.where(spiketrains[i].multiplexed[0]==0)] + i *(2500*pq.ms) for i in range(len(spiketrains))]
+        st1_long = [spiketrains[i].multiplexed[1][np.where(spiketrains[i].multiplexed[0]==1)] + i *(2500*pq.ms) for i in range(len(spiketrains))]
+        st0_concat = st0_long[0]
+        st1_concat = st1_long[0]
+        for i in range(1, len(st0_long)):
+            st0_concat = np.concatenate((st0_concat, st0_long[i]))
+            st1_concat = np.concatenate((st1_concat, st1_long[i]))
+        neo_st0 = neo.SpikeTrain((st0_concat/1000)* pq.s, t_start=0 * pq.s, t_stop=90 * pq.s)
+        neo_st1 = neo.SpikeTrain((st1_concat/1000)* pq.s, t_start=0 * pq.s, t_stop=90 * pq.s)
+
+
+        n_trials = 36
+        TW_length = 2.5 * pq.s  # sec
+        IDW_length = 1 * pq.s  # sec
+        TS_events = np.arange(0., n_trials * 2.5, 2.5) * pq.s  # 36 trials with 2.5s length and 0s background noise in between trials
+
+        # simulate buffered reading/transport of spiketrains,
+        # i.e. loop over spiketrain list and call update_ue()
+        ouea = OnlineUnitaryEventAnalysis(
+            bw_size=0.005 * pq.s, ew_pre_size=0. * pq.s,
+            ew_post_size=2.5 * pq.s, idw_size=IDW_length,
+            saw_size=0.1 * pq.s, saw_step=0.005 * pq.s,
+            mw_size=2.5 * IDW_length, significance_level_alpha=0.05,
+            target_event=TS_events)  # TODO: use one pyhsical unit as standard and rescale others accordingly
+        for i in range(90):
+            # sleep(1)
+            if i == 75:
+                print(f"step {i}")  # needed for debugging
+            ouea.update_uea(
+                spiketrains=[neo_st0.time_slice(t_start=i * IDW_length,
+                                                 t_stop=i * IDW_length + IDW_length),
+                             neo_st1.time_slice(t_start=i * IDW_length,
+                                                 t_stop=i * IDW_length + IDW_length)])
+            print(f"#buffer = {i}")
+        ue_dict_online = ouea.get_results()
+        ue_dict_online["input_parameters"]["t_stop"] += ue_dict_online["input_parameters"]["win_size"]  # compensates different win_pos definitions: center(online version) vs. left-edge(standard version)
+        viziphant.unitary_event_analysis.plot_ue(
+            spiketrains, Js_dict=ue_dict_online, significance_level=0.01, unit_real_ids=['1', '2'])  # different num of win_pos in plot_ue causes error
+        plt.show()
+
     # test: trial window = in-coming data window    (TW = IDW)
     # test: trial window < in-coming data window    (TW < IDW)
-
-
-
 
 
 if __name__ == '__main__':
