@@ -1,5 +1,5 @@
 from math import ceil
-
+import warnings
 import neo
 import numpy as np
 import quantities as pq
@@ -409,8 +409,8 @@ class OnlineUnitaryEventAnalysis:
                 # check if an overlap between the current and the upcoming trial ranges exists
                 if self._check_tw_overlap(current_target_event=current_target_event,
                                           next_target_event=next_target_event):
-                    raise UserWarning(f"Data in trial {self.tw_counter} will be analysed twice! "
-                                      "Adjust the target events and/or the trial window size.")
+                    warnings.warn(f"Data in trial {self.tw_counter} will be analysed twice! "
+                                      "Adjust the target events and/or the trial window size.", UserWarning)
                 else:  # no overlap exists
                     pass
             # # Subcase 4: IDW does not contain target event, i.e. just new spikes of the current trial
