@@ -1,17 +1,18 @@
-import unittest
-from time import perf_counter_ns, sleep
 import random
-import requests
+import unittest
+from time import perf_counter_ns
+
+import matplotlib.pyplot as plt
 import neo
 import numpy as np
 import quantities as pq
-import matplotlib.pyplot as plt
+import viziphant
 from elephant.conversion import BinnedSpikeTrain
 from elephant.spike_train_correlation import correlation_coefficient
 from elephant.spike_train_generation import homogeneous_poisson_process
-from elephant.unitary_event_analysis import jointJ_window_analysis
 from elephant.statistics import mean_firing_rate, isi
-import viziphant
+from elephant.unitary_event_analysis import jointJ_window_analysis
+
 from online_statistics import OnlineMeanFiringRate, OnlineInterSpikeInterval, \
     OnlinePearsonCorrelationCoefficient, OnlineUnitaryEventAnalysis
 
@@ -276,9 +277,12 @@ def _generate_spiketrains(freq, length, ts_events, injection_pos):
     injection = np.linspace(0, 0.1, 10)*pq.s
     all_injections = np.array([])
     for i in ts_events:
-        all_injections = np.concatenate((all_injections, (i+injection_pos)+injection), axis=0)*pq.s
-    st1 = st1.duplicate_with_new_data(np.sort(np.concatenate((st1.times, all_injections)))*pq.s)
-    st2 = st2.duplicate_with_new_data(np.sort(np.concatenate((st2.times, all_injections)))*pq.s)
+        all_injections = np.concatenate(
+            (all_injections, (i+injection_pos)+injection), axis=0) * pq.s
+    st1 = st1.duplicate_with_new_data(
+        np.sort(np.concatenate((st1.times, all_injections)))*pq.s)
+    st2 = st2.duplicate_with_new_data(
+        np.sort(np.concatenate((st2.times, all_injections)))*pq.s)
 
     return st1, st2
 
@@ -286,22 +290,9 @@ def _generate_spiketrains(freq, length, ts_events, injection_pos):
 class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.rtol = 1e-15
-        cls.atol = 1e-15
-        cls.num_neurons = 10
-        cls.num_buffers = 100
-        cls.buff_size = 1  # in sec
         np.random.seed(73)
 
     def setUp(self):
-        pass
-
-    # test sensitivity (low FN rate) with injected coincidences
-    def test_sensitivity_with_injected_coincidences(self):
-        pass
-
-    # test selectivity (low FP rate) with injected coincidences
-    def test_selectivity_with_injected_coincidences(self):
         pass
 
     # test: trial window > in-coming data window    (TW > IDW)
@@ -310,43 +301,89 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         larger than the in-coming data window with artifical data."""
         n_trials = 40
         TW_length = 1 * pq.s  # sec
+        noise_length = 1.5 * pq.s
         IDW_length = 1 * pq.s  # sec
-        TS_events = np.arange(0.5, n_trials*2.5, 2.5)*pq.s  # 40 trials with 1s length and 1.5s background noise in between trials
-        # create two long random homogeneous poisson spiketrains
+        TS_events = np.arange(0.5, n_trials*2.5, 2.5)*pq.s
+
+        # create two long random homogeneous poisson spiketrains which represent
+        # 40 trials with 1s length and 1.5s background noise in between trials
+        n_buffers = int(n_trials * (TW_length + noise_length) / IDW_length)
         st1_long, st2_long = _generate_spiketrains(
-            freq=5*pq.Hz, length=IDW_length * self.num_buffers, ts_events=TS_events,
-            injection_pos=0.1*pq.s)
+            freq=5*pq.Hz, length=IDW_length * n_buffers,
+            ts_events=TS_events, injection_pos=0.1*pq.s)
         # stack spiketrains by trial
-        st1_stacked = [st1_long.time_slice(t_start=i-TW_length/2, t_stop=i+TW_length/2).time_shift(-i+TW_length/2) for i in TS_events]
-        st2_stacked = [st2_long.time_slice(t_start=i-TW_length/2, t_stop=i+TW_length/2).time_shift(-i+TW_length/2) for i in TS_events]
-
+        st1_stacked = [st1_long.time_slice(
+            t_start=i-TW_length/2,
+            t_stop=i+TW_length/2).time_shift(-i+TW_length/2)
+                       for i in TS_events]
+        st2_stacked = [st2_long.time_slice(
+            t_start=i-TW_length/2,
+            t_stop=i+TW_length/2).time_shift(-i+TW_length/2)
+                       for i in TS_events]
         spiketrains = np.stack((st1_stacked, st2_stacked), axis=1)
-        ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms, win_size=100*pq.ms, win_step=5*pq.ms)
-        viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=ue_dict, significance_level=0.01, unit_real_ids=['1', '2'])
-        plt.show()
 
+        # perform standard unitary event analysis
+        ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
+                                         win_size=100*pq.ms, win_step=5*pq.ms)
+        # viziphant.unitary_event_analysis.plot_ue(
+        #     spiketrains, Js_dict=ue_dict, significance_level=0.01,
+        #     unit_real_ids=['1', '2'])
+        # plt.show()
+
+        # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
+        # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005*pq.s, ew_pre_size=0.5*pq.s,
             ew_post_size=0.5*pq.s, idw_size=IDW_length,
             saw_size=0.1*pq.s, saw_step=0.005*pq.s,
-            mw_size=2.5*IDW_length, significance_level_alpha=0.05,
-            target_event=TS_events) # TODO: use one pyhsical unit as standard and rescale others accordingly
-        for i in range(self.num_buffers):
-            # sleep(1)
-            if i == 75:
-                print(f"step {i}")  # needed for debugging
+            mw_size=2.5*IDW_length, trigger_event=TS_events)
+        for i in range(n_buffers):
+            # if i == 1:                # DEBUG-aid
+            #     print(f"step {i}")    # DEBUG-aid
             ouea.update_uea(
-                spiketrains=[st1_long.time_slice(t_start=i*IDW_length,
-                                            t_stop=i*IDW_length+IDW_length),
-                             st2_long.time_slice(t_start=i*IDW_length,
-                                            t_stop=i*IDW_length+IDW_length)])
-            print(f"#buffer = {i}")
+                spiketrains=[
+                    st1_long.time_slice(t_start=i*IDW_length,
+                                        t_stop=i*IDW_length+IDW_length),
+                    st2_long.time_slice(t_start=i*IDW_length,
+                                        t_stop=i*IDW_length+IDW_length)])
+            print(f"#buffer = {i}")   # DEBUG-aid
         ue_dict_online = ouea.get_results()
-        ue_dict_online["input_parameters"]["t_stop"] += ue_dict_online["input_parameters"]["win_size"]  # compensates different win_pos definitions: center(online version) vs. left-edge(standard version)
-        viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=ue_dict_online, significance_level=0.01, unit_real_ids=['1', '2'])  # different num of win_pos in plot_ue causes error
-        plt.show()
+        # viziphant.unitary_event_analysis.plot_ue(
+        #     spiketrains, Js_dict=ue_dict_online, significance_level=0.01,
+        #     unit_real_ids=['1', '2'])
+        # plt.show()
+
+        # assert equality between result dicts of standard and online ue version
+        with self.subTest("test 'Js' equality"):
+            np.testing.assert_allclose(actual=ue_dict_online["Js"],
+                                       desired=ue_dict["Js"],
+                                       atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'indices' equality"):
+            for key in ue_dict["indices"].keys():
+                np.testing.assert_allclose(
+                    actual=ue_dict_online["indices"][key],
+                    desired=ue_dict["indices"][key],
+                    atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'n_emp' equality"):
+            np.testing.assert_allclose(actual=ue_dict_online["n_emp"],
+                                       desired=ue_dict["n_emp"],
+                                       atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'n_exp' equality"):
+            np.testing.assert_allclose(actual=ue_dict_online["n_exp"],
+                                       desired=ue_dict["n_exp"],
+                                       atol=1e-4, rtol=1e-7)
+        with self.subTest("test 'rate_avg' equality"):
+            np.testing.assert_allclose(
+                actual=ue_dict_online["rate_avg"].magnitude,
+                desired=ue_dict["rate_avg"].magnitude,
+                atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'input_parameters' equality"):
+            for key in ue_dict["input_parameters"].keys():
+                np.testing.assert_equal(
+                    actual=ue_dict_online["input_parameters"][key],
+                    desired=ue_dict["input_parameters"][key])
 
     def test_TW_larger_IDW_real_data(self):
         """Test, if online UE analysis is correct when the trial window is
@@ -355,59 +392,101 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         random.seed(1224)
 
         # load data and extract spiketrains
+        # 36 trials with 2.1s length and 0s background noise in between trials
         io = neo.io.NixIO("data/dataset-1.nix", 'ro')
         block = io.read_block()
         spiketrains = []
         # each segment contains a single trial
         for ind in range(len(block.segments)):
             spiketrains.append(block.segments[ind].spiketrains)
-        # calculate Unitary Events
-        UE = jointJ_window_analysis(
-            spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
-            winstep=10 * pq.ms, pattern_hash=[3])
-        # plot results
-        viziphant.unitary_event_analysis.plot_ue(spiketrains, Js_dict=UE, significance_level=0.05, unit_real_ids=['1', '2'])
-        plt.show()
 
-        st0_long = [spiketrains[i].multiplexed[1][np.where(spiketrains[i].multiplexed[0]==0)] + i *(2500*pq.ms) for i in range(len(spiketrains))]
-        st1_long = [spiketrains[i].multiplexed[1][np.where(spiketrains[i].multiplexed[0]==1)] + i *(2500*pq.ms) for i in range(len(spiketrains))]
+        # perform standard unitary events analysis
+        ue_dict = jointJ_window_analysis(
+            spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
+            winstep=5 * pq.ms, pattern_hash=[3])
+        # plot results
+        # viziphant.unitary_event_analysis.plot_ue(
+        #     spiketrains, Js_dict=ue_dict, significance_level=0.05,
+        #     unit_real_ids=['1', '2'])
+        # plt.show()
+
+        st0_long = [spiketrains[i].multiplexed[1][
+                        np.where(spiketrains[i].multiplexed[0] == 0)]
+                    + i * (2100*pq.ms)
+                    for i in range(len(spiketrains))]
+        st1_long = [spiketrains[i].multiplexed[1][
+                        np.where(spiketrains[i].multiplexed[0] == 1)]
+                    + i * (2100*pq.ms)
+                    for i in range(len(spiketrains))]
         st0_concat = st0_long[0]
         st1_concat = st1_long[0]
         for i in range(1, len(st0_long)):
             st0_concat = np.concatenate((st0_concat, st0_long[i]))
             st1_concat = np.concatenate((st1_concat, st1_long[i]))
-        neo_st0 = neo.SpikeTrain((st0_concat/1000)* pq.s, t_start=0 * pq.s, t_stop=90 * pq.s)
-        neo_st1 = neo.SpikeTrain((st1_concat/1000)* pq.s, t_start=0 * pq.s, t_stop=90 * pq.s)
-
+        neo_st0 = neo.SpikeTrain((st0_concat/1000) * pq.s, t_start=0 * pq.s,
+                                 t_stop=36*2.1 * pq.s)
+        neo_st1 = neo.SpikeTrain((st1_concat/1000) * pq.s, t_start=0 * pq.s,
+                                 t_stop=36*2.1 * pq.s)
 
         n_trials = 36
-        TW_length = 2.5 * pq.s  # sec
+        TW_length = 2.1 * pq.s  # sec
         IDW_length = 1 * pq.s  # sec
-        TS_events = np.arange(0., n_trials * 2.5, 2.5) * pq.s  # 36 trials with 2.5s length and 0s background noise in between trials
+        TS_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
 
+        # perform online unitary events analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
+        # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005 * pq.s, ew_pre_size=0. * pq.s,
-            ew_post_size=2.5 * pq.s, idw_size=IDW_length,
+            ew_post_size=2.1 * pq.s, idw_size=IDW_length,
             saw_size=0.1 * pq.s, saw_step=0.005 * pq.s,
-            mw_size=2.5 * IDW_length, significance_level_alpha=0.05,
-            target_event=TS_events)  # TODO: use one pyhsical unit as standard and rescale others accordingly
-        for i in range(90):
-            # sleep(1)
-            if i == 75:
-                print(f"step {i}")  # needed for debugging
+            mw_size=2.5 * IDW_length, trigger_event=TS_events)
+        for i in range(75):
+            # if i == 35:                   # DEBUG-aid
+            #     print(f"step {i}")        # DEBUG-aid
             ouea.update_uea(
-                spiketrains=[neo_st0.time_slice(t_start=i * IDW_length,
-                                                 t_stop=i * IDW_length + IDW_length),
-                             neo_st1.time_slice(t_start=i * IDW_length,
-                                                 t_stop=i * IDW_length + IDW_length)])
-            print(f"#buffer = {i}")
+                spiketrains=[
+                    neo_st0.time_slice(t_start=i * IDW_length,
+                                       t_stop=i * IDW_length + IDW_length),
+                    neo_st1.time_slice(t_start=i * IDW_length,
+                                       t_stop=i * IDW_length + IDW_length)])
+            print(f"#buffer = {i}")       # DEBUG-aid
         ue_dict_online = ouea.get_results()
-        ue_dict_online["input_parameters"]["t_stop"] += ue_dict_online["input_parameters"]["win_size"]  # compensates different win_pos definitions: center(online version) vs. left-edge(standard version)
-        viziphant.unitary_event_analysis.plot_ue(
-            spiketrains, Js_dict=ue_dict_online, significance_level=0.01, unit_real_ids=['1', '2'])  # different num of win_pos in plot_ue causes error
-        plt.show()
+        # viziphant.unitary_event_analysis.plot_ue(
+        #     spiketrains, Js_dict=ue_dict_online, significance_level=0.05,
+        #     unit_real_ids=['1', '2'])
+        # plt.show()
+
+        # assert equality between result dicts of standard and online ue version
+        with self.subTest("test 'Js' equality"):
+            np.testing.assert_allclose(actual=ue_dict_online["Js"],
+                                       desired=ue_dict["Js"],
+                                       atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'indices' equality"):
+            for key in ue_dict["indices"].keys():
+                np.testing.assert_allclose(
+                    actual=ue_dict_online["indices"][key],
+                    desired=ue_dict["indices"][key],
+                    atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'n_emp' equality"):
+            np.testing.assert_allclose(actual=ue_dict_online["n_emp"],
+                                       desired=ue_dict["n_emp"],
+                                       atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'n_exp' equality"):
+            np.testing.assert_allclose(actual=ue_dict_online["n_exp"],
+                                       desired=ue_dict["n_exp"],
+                                       atol=1e-4, rtol=1e-7)
+        with self.subTest("test 'rate_avg' equality"):
+            np.testing.assert_allclose(
+                actual=ue_dict_online["rate_avg"].magnitude,
+                desired=ue_dict["rate_avg"].magnitude,
+                atol=1e-7, rtol=1e-7)
+        with self.subTest("test 'input_parameters' equality"):
+            for key in ue_dict["input_parameters"].keys():
+                np.testing.assert_equal(
+                    actual=ue_dict_online["input_parameters"][key],
+                    desired=ue_dict["input_parameters"][key])
 
     # test: trial window = in-coming data window    (TW = IDW)
     # test: trial window < in-coming data window    (TW < IDW)
