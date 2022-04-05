@@ -299,6 +299,26 @@ def _visualize_results_of_offline_and_online_uea(
     plt.show()
 
 
+def _simulate_buffered_reading(n_buffers, ouea, st1, st2, IDW_length,
+                               length_remainder):
+    for i in range(n_buffers):
+        if length_remainder > 1e-7 and i == n_buffers - 1:
+            ouea.update_uea(
+                spiketrains=[
+                    st1.time_slice(t_start=i * IDW_length,
+                                   t_stop=i * IDW_length + length_remainder),
+                    st2.time_slice(t_start=i * IDW_length,
+                                   t_stop=i * IDW_length + length_remainder)])
+        else:
+            ouea.update_uea(
+                spiketrains=[
+                    st1.time_slice(t_start=i * IDW_length,
+                                    t_stop=i * IDW_length + IDW_length),
+                    st2.time_slice(t_start=i * IDW_length,
+                                   t_stop=i * IDW_length + IDW_length)])
+        print(f"#buffer = {i}")  # DEBUG-aid
+
+
 class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -306,6 +326,49 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
 
     def setUp(self):
         pass
+
+    def _assert_equality_of_result_dicts(self, ue_dict_offline, ue_dict_online,
+                                         tol_dict_user):
+        tol_dict = {"atol_Js": 1e-7, "rtol_Js": 1e-7,
+                    "atol_indices": 1e-7, "rtol_indices": 1e-7,
+                    "atol_n_emp": 1e-7, "rtol_n_emp": 1e-7,
+                    "atol_n_exp": 1e-7, "rtol_n_exp": 1e-7,
+                    "atol_rate_avg": 1e-7, "rtol_rate_avg": 1e-7}
+        tol_dict.update(tol_dict_user)
+
+        with self.subTest("test 'Js' equality"):
+            np.testing.assert_allclose(
+                actual=ue_dict_online["Js"], desired=ue_dict_offline["Js"],
+                atol=tol_dict["atol_Js"],
+                rtol=tol_dict["rtol_Js"])
+        with self.subTest("test 'indices' equality"):
+            for key in ue_dict_offline["indices"].keys():
+                np.testing.assert_allclose(
+                    actual=ue_dict_online["indices"][key],
+                    desired=ue_dict_offline["indices"][key],
+                    atol=tol_dict["atol_indices"],
+                    rtol=tol_dict["rtol_indices"])
+        with self.subTest("test 'n_emp' equality"):
+            np.testing.assert_allclose(
+                actual=ue_dict_online["n_emp"],
+                desired=ue_dict_offline["n_emp"],
+                atol=tol_dict["atol_n_emp"], rtol=tol_dict["rtol_n_emp"])
+        with self.subTest("test 'n_exp' equality"):
+            np.testing.assert_allclose(
+                actual=ue_dict_online["n_exp"],
+                desired=ue_dict_offline["n_exp"],
+                atol=tol_dict["atol_n_exp"],
+                rtol=tol_dict["rtol_n_exp"])
+        with self.subTest("test 'rate_avg' equality"):
+            np.testing.assert_allclose(
+                actual=ue_dict_online["rate_avg"].magnitude,
+                desired=ue_dict_offline["rate_avg"].magnitude,
+                atol=tol_dict["atol_rate_avg"], rtol=tol_dict["rtol_rate_avg"])
+        with self.subTest("test 'input_parameters' equality"):
+            for key in ue_dict_offline["input_parameters"].keys():
+                np.testing.assert_equal(
+                    actual=ue_dict_online["input_parameters"][key],
+                    desired=ue_dict_offline["input_parameters"][key])
 
     # test: trial window > in-coming data window    (TW > IDW)
     def test_TW_larger_IDW_artificial_data(self):
@@ -317,10 +380,14 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # DEBUG-info: IDW_length = 0.9s, 0.8s 0k; fails for <=0.7s in 0.1s steps
         IDW_length = 0.8 * pq.s  # sec
         TS_events = np.arange(0.5, n_trials*2.5, 2.5)*pq.s
+        _n_buffers_float = n_trials * (TW_length + noise_length) / IDW_length
+        _n_buffers_int = int(_n_buffers_float)
+        _n_buffers_fraction = _n_buffers_float - _n_buffers_int
+        n_buffers = _n_buffers_int + 1 if _n_buffers_fraction > 1e-7 else _n_buffers_int
+        length_remainder = _n_buffers_fraction * pq.s
 
         # create two long random homogeneous poisson spiketrains which represent
         # 40 trials with 1s length and 1.5s background noise in between trials
-        n_buffers = int(n_trials * (TW_length + noise_length) / IDW_length)
         st1_long, st2_long = _generate_spiketrains(
             freq=5*pq.Hz, length=IDW_length * n_buffers,
             ts_events=TS_events, injection_pos=0.1*pq.s)
@@ -339,54 +406,26 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
                                          win_size=100*pq.ms, win_step=5*pq.ms)
 
-        # perform online unitary event analysis
-        # simulate buffered reading/transport of spiketrains,
-        # i.e. loop over spiketrain list and call update_ue()
+        # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005*pq.s, ew_pre_size=0.5*pq.s,
             ew_post_size=0.5*pq.s, idw_size=IDW_length,
             saw_size=0.1*pq.s, saw_step=0.005*pq.s,
             mw_size=2.5*IDW_length, trigger_event=TS_events)
-        for i in range(n_buffers):
-            ouea.update_uea(
-                spiketrains=[
-                    st1_long.time_slice(t_start=i*IDW_length,
-                                        t_stop=i*IDW_length+IDW_length),
-                    st2_long.time_slice(t_start=i*IDW_length,
-                                        t_stop=i*IDW_length+IDW_length)])
-            print(f"#buffer = {i}")   # DEBUG-aid
+        # perform online unitary event analysis
+        # simulate buffered reading/transport of spiketrains,
+        # i.e. loop over spiketrain list and call update_ue()
+        _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=st1_long,
+                                   st2=st2_long, IDW_length=IDW_length,
+                                   length_remainder=length_remainder)
         ue_dict_online = ouea.get_results()
 
         # assert equality between result dicts of standard and online ue version
-        with self.subTest("test 'Js' equality"):
-            np.testing.assert_allclose(actual=ue_dict_online["Js"],
-                                       desired=ue_dict["Js"],
-                                       atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'indices' equality"):
-            for key in ue_dict["indices"].keys():
-                np.testing.assert_allclose(
-                    actual=ue_dict_online["indices"][key],
-                    desired=ue_dict["indices"][key],
-                    atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'n_emp' equality"):
-            np.testing.assert_allclose(actual=ue_dict_online["n_emp"],
-                                       desired=ue_dict["n_emp"],
-                                       atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'n_exp' equality"):
-            np.testing.assert_allclose(actual=ue_dict_online["n_exp"],
-                                       desired=ue_dict["n_exp"],
-                                       atol=5e-5, rtol=1e-7)  # fixme: larger atol ok?
-        with self.subTest("test 'rate_avg' equality"):
-            np.testing.assert_allclose(
-                actual=ue_dict_online["rate_avg"].magnitude,
-                desired=ue_dict["rate_avg"].magnitude,
-                atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'input_parameters' equality"):
-            for key in ue_dict["input_parameters"].keys():
-                np.testing.assert_equal(
-                    actual=ue_dict_online["input_parameters"][key],
-                    desired=ue_dict["input_parameters"][key])
+        self._assert_equality_of_result_dicts(
+            ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
+            tol_dict_user={"atol_n_exp": 5e-5})
+        # fixme: larger atol ok?
 
         # visualize results of online and standard UEA for artifical data
         _visualize_results_of_offline_and_online_uea(
@@ -413,22 +452,22 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
             winstep=5 * pq.ms, pattern_hash=[3])
 
-        st0_long = [spiketrains[i].multiplexed[1][
+        st1_long = [spiketrains[i].multiplexed[1][
                         np.where(spiketrains[i].multiplexed[0] == 0)]
                     + i * (2100*pq.ms)
                     for i in range(len(spiketrains))]
-        st1_long = [spiketrains[i].multiplexed[1][
+        st2_long = [spiketrains[i].multiplexed[1][
                         np.where(spiketrains[i].multiplexed[0] == 1)]
                     + i * (2100*pq.ms)
                     for i in range(len(spiketrains))]
-        st0_concat = st0_long[0]
         st1_concat = st1_long[0]
-        for i in range(1, len(st0_long)):
-            st0_concat = np.concatenate((st0_concat, st0_long[i]))
+        st2_concat = st2_long[0]
+        for i in range(1, len(st1_long)):
             st1_concat = np.concatenate((st1_concat, st1_long[i]))
-        neo_st0 = neo.SpikeTrain((st0_concat/1000) * pq.s, t_start=0 * pq.s,
-                                 t_stop=36*2.1 * pq.s)
+            st2_concat = np.concatenate((st2_concat, st2_long[i]))
         neo_st1 = neo.SpikeTrain((st1_concat/1000) * pq.s, t_start=0 * pq.s,
+                                 t_stop=36*2.1 * pq.s)
+        neo_st2 = neo.SpikeTrain((st2_concat/1000) * pq.s, t_start=0 * pq.s,
                                  t_stop=36*2.1 * pq.s)
 
         n_trials = 36
@@ -440,64 +479,29 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         _n_buffers_int = int(_n_buffers_float)
         _n_buffers_fraction = _n_buffers_float - _n_buffers_int
         n_buffers = _n_buffers_int + 1
-        length_of_last_half_filled_buffer = _n_buffers_fraction * pq.s
+        length_remainder = _n_buffers_fraction * pq.s
 
-        # perform online unitary events analysis
-        # simulate buffered reading/transport of spiketrains,
-        # i.e. loop over spiketrain list and call update_ue()
+        # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005 * pq.s, ew_pre_size=0. * pq.s,
             ew_post_size=2.1 * pq.s, idw_size=IDW_length,
             saw_size=0.1 * pq.s, saw_step=0.005 * pq.s,
             mw_size=2.5 * IDW_length, trigger_event=TS_events)
-        for i in range(n_buffers):
-            if i == n_buffers-1:
-                ouea.update_uea(
-                    spiketrains=[
-                        neo_st0.time_slice(t_start=i * IDW_length,
-                                           t_stop=i * IDW_length + length_of_last_half_filled_buffer),
-                        neo_st1.time_slice(t_start=i * IDW_length,
-                                           t_stop=i * IDW_length + length_of_last_half_filled_buffer)])
-            else:
-                ouea.update_uea(
-                    spiketrains=[
-                        neo_st0.time_slice(t_start=i * IDW_length,
-                                           t_stop=i * IDW_length + IDW_length),
-                        neo_st1.time_slice(t_start=i * IDW_length,
-                                           t_stop=i * IDW_length + IDW_length)])
-            print(f"#buffer = {i}")       # DEBUG-aid
+        # perform online unitary events analysis
+        # simulate buffered reading/transport of spiketrains,
+        # i.e. loop over spiketrain list and call update_ue()
+        _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=neo_st1,
+                                   st2=neo_st2, IDW_length=IDW_length,
+                                   length_remainder=length_remainder)
         ue_dict_online = ouea.get_results()
 
         # assert equality between result dicts of standard and online ue version
-        with self.subTest("test 'Js' equality"):
-            np.testing.assert_allclose(actual=ue_dict_online["Js"],
-                                       desired=ue_dict["Js"],
-                                       atol=1e-6, rtol=4e-5)  # fixme: larger rtol & atol ok?
-        with self.subTest("test 'indices' equality"):
-            for key in ue_dict["indices"].keys():
-                np.testing.assert_allclose(
-                    actual=ue_dict_online["indices"][key],
-                    desired=ue_dict["indices"][key],
-                    atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'n_emp' equality"):
-            np.testing.assert_allclose(actual=ue_dict_online["n_emp"],
-                                       desired=ue_dict["n_emp"],
-                                       atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'n_exp' equality"):
-            np.testing.assert_allclose(actual=ue_dict_online["n_exp"],
-                                       desired=ue_dict["n_exp"],
-                                       atol=3e-6, rtol=3e-7)  # fixme: larger atol & rtol ok?
-        with self.subTest("test 'rate_avg' equality"):
-            np.testing.assert_allclose(
-                actual=ue_dict_online["rate_avg"].magnitude,
-                desired=ue_dict["rate_avg"].magnitude,
-                atol=1e-7, rtol=1e-7)
-        with self.subTest("test 'input_parameters' equality"):
-            for key in ue_dict["input_parameters"].keys():
-                np.testing.assert_equal(
-                    actual=ue_dict_online["input_parameters"][key],
-                    desired=ue_dict["input_parameters"][key])
+        self._assert_equality_of_result_dicts(
+            ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
+            tol_dict_user={"atol_Js": 1e-6, "rtol_Js": 4e-5,
+                           "atol_n_exp": 3e-6, "rtol_n_exp": 3e-7})
+        # fixme: larger atol & rtol ok?
 
         # visualize results of online and standard UEA for real data
         _visualize_results_of_offline_and_online_uea(
