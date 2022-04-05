@@ -319,6 +319,36 @@ def _simulate_buffered_reading(n_buffers, ouea, st1, st2, IDW_length,
         print(f"#buffer = {i}")  # DEBUG-aid
 
 
+def _load_real_data(n_trials, trial_length):
+    # load data and extract spiketrains
+    io = neo.io.NixIO("data/dataset-1.nix", 'ro')
+    block = io.read_block()
+    spiketrains = []
+    # each segment contains a single trial
+    for ind in range(len(block.segments)):
+        spiketrains.append(block.segments[ind].spiketrains)
+
+    # for each neuron: concatenate all trials to one long neo.Spiketrain
+    st1_long = [spiketrains[i].multiplexed[1][
+                    np.where(spiketrains[i].multiplexed[0] == 0)]
+                + i * (trial_length)
+                for i in range(len(spiketrains))]
+    st2_long = [spiketrains[i].multiplexed[1][
+                    np.where(spiketrains[i].multiplexed[0] == 1)]
+                + i * (trial_length)
+                for i in range(len(spiketrains))]
+    st1_concat = st1_long[0]
+    st2_concat = st2_long[0]
+    for i in range(1, len(st1_long)):
+        st1_concat = np.concatenate((st1_concat, st1_long[i]))
+        st2_concat = np.concatenate((st2_concat, st2_long[i]))
+    neo_st1 = neo.SpikeTrain((st1_concat / 1000) * pq.s, t_start=0 * pq.s,
+                             t_stop=n_trials * trial_length)
+    neo_st2 = neo.SpikeTrain((st2_concat / 1000) * pq.s, t_start=0 * pq.s,
+                             t_stop=n_trials * trial_length)
+    return spiketrains, neo_st1, neo_st2
+
+
 class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -438,40 +468,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # Fix random seed to guarantee fixed output
         random.seed(1224)
 
-        # load data and extract spiketrains
-        # 36 trials with 2.1s length and 0s background noise in between trials
-        io = neo.io.NixIO("data/dataset-1.nix", 'ro')
-        block = io.read_block()
-        spiketrains = []
-        # each segment contains a single trial
-        for ind in range(len(block.segments)):
-            spiketrains.append(block.segments[ind].spiketrains)
-
-        # perform standard unitary events analysis
-        ue_dict = jointJ_window_analysis(
-            spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
-            winstep=5 * pq.ms, pattern_hash=[3])
-
-        st1_long = [spiketrains[i].multiplexed[1][
-                        np.where(spiketrains[i].multiplexed[0] == 0)]
-                    + i * (2100*pq.ms)
-                    for i in range(len(spiketrains))]
-        st2_long = [spiketrains[i].multiplexed[1][
-                        np.where(spiketrains[i].multiplexed[0] == 1)]
-                    + i * (2100*pq.ms)
-                    for i in range(len(spiketrains))]
-        st1_concat = st1_long[0]
-        st2_concat = st2_long[0]
-        for i in range(1, len(st1_long)):
-            st1_concat = np.concatenate((st1_concat, st1_long[i]))
-            st2_concat = np.concatenate((st2_concat, st2_long[i]))
-        neo_st1 = neo.SpikeTrain((st1_concat/1000) * pq.s, t_start=0 * pq.s,
-                                 t_stop=36*2.1 * pq.s)
-        neo_st2 = neo.SpikeTrain((st2_concat/1000) * pq.s, t_start=0 * pq.s,
-                                 t_stop=36*2.1 * pq.s)
-
-        n_trials = 36
-        TW_length = 2.1 * pq.s  # sec
+        # set relevant variables of this TestCase
+        n_trials = 36                       # determinded by real data
+        TW_length = 2.1 * pq.s  # sec       # determinded by real data
         IDW_length = 1 * pq.s  # sec
         noise_length = 0. * pq.s
         TS_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
@@ -480,6 +479,16 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         _n_buffers_fraction = _n_buffers_float - _n_buffers_int
         n_buffers = _n_buffers_int + 1
         length_remainder = _n_buffers_fraction * pq.s
+
+        # load data and extract spiketrains
+        # 36 trials with 2.1s length and 0s background noise in between trials
+        spiketrains, neo_st1, neo_st2 = _load_real_data(n_trials=n_trials,
+                                                        trial_length=TW_length)
+
+        # perform standard unitary events analysis
+        ue_dict = jointJ_window_analysis(
+            spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
+            winstep=5 * pq.ms, pattern_hash=[3])
 
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
