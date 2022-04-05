@@ -264,7 +264,7 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
                                    rtol=self.rtol, atol=self.atol)
 
 
-def _generate_spiketrains(freq, length, ts_events, injection_pos):
+def _generate_spiketrains(freq, length, ts_events, injection_pos, tw_length):
     """
     Generate two spiketrains from an homogeneous Poisson process with
     injected coincideces.
@@ -284,7 +284,18 @@ def _generate_spiketrains(freq, length, ts_events, injection_pos):
     st2 = st2.duplicate_with_new_data(
         np.sort(np.concatenate((st2.times, all_injections)))*pq.s)
 
-    return st1, st2
+    # stack spiketrains by trial
+    st1_stacked = [st1.time_slice(
+        t_start=i - tw_length / 2,
+        t_stop=i + tw_length / 2).time_shift(-i + tw_length / 2)
+                   for i in ts_events]
+    st2_stacked = [st2.time_slice(
+        t_start=i - tw_length / 2,
+        t_stop=i + tw_length / 2).time_shift(-i + tw_length / 2)
+                   for i in ts_events]
+    spiketrains = np.stack((st1_stacked, st2_stacked), axis=1)
+
+    return spiketrains, st1, st2
 
 
 def _visualize_results_of_offline_and_online_uea(
@@ -349,6 +360,15 @@ def _load_real_data(n_trials, trial_length):
     return spiketrains, neo_st1, neo_st2
 
 
+def _calculate_n_buffers(n_trials, tw_length, noise_length, idw_length):
+    _n_buffers_float = n_trials * (tw_length + noise_length) / idw_length
+    _n_buffers_int = int(_n_buffers_float)
+    _n_buffers_fraction = _n_buffers_float - _n_buffers_int
+    n_buffers = _n_buffers_int + 1 if _n_buffers_fraction > 1e-7 else _n_buffers_int
+    length_remainder = _n_buffers_fraction * pq.s
+    return n_buffers, length_remainder
+
+
 class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -404,33 +424,22 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     def test_TW_larger_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
         larger than the in-coming data window with artifical data."""
+        # set relevant variables of this TestCase
         n_trials = 40
         TW_length = 1 * pq.s  # sec
         noise_length = 1.5 * pq.s
         # DEBUG-info: IDW_length = 0.9s, 0.8s 0k; fails for <=0.7s in 0.1s steps
         IDW_length = 0.8 * pq.s  # sec
         TS_events = np.arange(0.5, n_trials*2.5, 2.5)*pq.s
-        _n_buffers_float = n_trials * (TW_length + noise_length) / IDW_length
-        _n_buffers_int = int(_n_buffers_float)
-        _n_buffers_fraction = _n_buffers_float - _n_buffers_int
-        n_buffers = _n_buffers_int + 1 if _n_buffers_fraction > 1e-7 else _n_buffers_int
-        length_remainder = _n_buffers_fraction * pq.s
+        n_buffers, length_remainder = _calculate_n_buffers(
+            n_trials=n_trials, tw_length=TW_length,
+            noise_length=noise_length, idw_length=IDW_length)
 
         # create two long random homogeneous poisson spiketrains which represent
         # 40 trials with 1s length and 1.5s background noise in between trials
-        st1_long, st2_long = _generate_spiketrains(
+        spiketrains, st1_long, st2_long = _generate_spiketrains(
             freq=5*pq.Hz, length=IDW_length * n_buffers,
-            ts_events=TS_events, injection_pos=0.1*pq.s)
-        # stack spiketrains by trial
-        st1_stacked = [st1_long.time_slice(
-            t_start=i-TW_length/2,
-            t_stop=i+TW_length/2).time_shift(-i+TW_length/2)
-                       for i in TS_events]
-        st2_stacked = [st2_long.time_slice(
-            t_start=i-TW_length/2,
-            t_stop=i+TW_length/2).time_shift(-i+TW_length/2)
-                       for i in TS_events]
-        spiketrains = np.stack((st1_stacked, st2_stacked), axis=1)
+            ts_events=TS_events, injection_pos=0.1*pq.s, tw_length=TW_length)
 
         # perform standard unitary event analysis
         ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
@@ -474,11 +483,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         IDW_length = 1 * pq.s  # sec
         noise_length = 0. * pq.s
         TS_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
-        _n_buffers_float = n_trials * (TW_length + noise_length) / IDW_length
-        _n_buffers_int = int(_n_buffers_float)
-        _n_buffers_fraction = _n_buffers_float - _n_buffers_int
-        n_buffers = _n_buffers_int + 1
-        length_remainder = _n_buffers_fraction * pq.s
+        n_buffers, length_remainder = _calculate_n_buffers(
+            n_trials=n_trials, tw_length=TW_length,
+            noise_length=noise_length, idw_length=IDW_length)
 
         # load data and extract spiketrains
         # 36 trials with 2.1s length and 0s background noise in between trials
