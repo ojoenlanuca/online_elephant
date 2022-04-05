@@ -230,12 +230,12 @@ class OnlineUnitaryEventAnalysis:
         p = self._pval(self.n_emp_win, self.n_exp_win).flatten()
         self.Js_win = jointJ(p)
         return {
-            'Js': self.Js_win.reshape(len(self.Js_win), 1),
+            'Js': self.Js_win.reshape((len(self.Js_win), 1)),
             'indices': self.indices_win,
-            'n_emp': self.n_emp_win,
-            'n_exp': self.n_exp_win,
+            'n_emp': self.n_emp_win.reshape((len(self.n_emp_win), 1)),
+            'n_exp': self.n_exp_win.reshape((len(self.n_exp_win), 1)),
             'rate_avg':
-                (self.rate_avg / self.bw_size.rescale(pq.ms)) / self.n_trials,
+                self.rate_avg.reshape((len(self.rate_avg), 1, 2)) / (self.bw_size.rescale(pq.ms) * self.n_trials),
             'input_parameters': self.input_parameters}
 
     def _pval(self, n_emp, n_exp):
@@ -245,15 +245,16 @@ class OnlineUnitaryEventAnalysis:
         return p
 
     def _save_idw_into_mw(self, idw):
-        """Save in-ioming data window (IDW) into memory window (MW)."""
+        """Save in-incoming data window (IDW) into memory window (MW)."""
         for i in range(self.n_neurons):
             self.mw[i] += idw[i].tolist()
 
-    def _move_mw(self, overlap, t_stop):
+    def _move_mw(self, new_t_start):
         """Move memory window."""
+        # TODO: too small overlap leads to too fast moving of mv,
+        #  i.e. spikes of current trial are discarded
         for i in range(self.n_neurons):
-            idx = np.where((t_stop - overlap <= self.mw[i]) &
-                           (self.mw[i] <= t_stop))[0]
+            idx = np.where(new_t_start <= self.mw[i])[0]
             if not len(idx) == 0:  # move mv
                 self.mw[i] = self.mw[i][idx[0]:idx[-1]+1]
             else:  # keep mv
@@ -321,8 +322,6 @@ class OnlineUnitaryEventAnalysis:
 
         # iterate over saw positions
         for i in range(self.saw_pos_counter, self.n_windows):
-            # if i == 400:                          # DEBUG-aid
-            #     print(f"idx_pos={i}")             # DEBUG-aid
             p_realtime = self.t_winpos[i]
             p_bintime = self.t_winpos_bintime[i] - self.t_winpos_bintime[0]
             # check if saw filled with data? yes: -> a) & b);  no: -> pause
@@ -344,7 +343,6 @@ class OnlineUnitaryEventAnalysis:
                 Js_win, rate_avg, n_exp_win, n_emp_win, indices_lst = _UE(
                     mat_win, pattern_hash=self.pattern_hash,
                     method=self.method, n_surrogates=self.n_surrogates)
-                # self.Js_win[i] += Js_win
                 self.rate_avg[i] += rate_avg
                 self.n_exp_win[i] += n_exp_win
                 self.n_emp_win[i] += n_emp_win
@@ -357,14 +355,13 @@ class OnlineUnitaryEventAnalysis:
                 break
             if i == self.n_windows-1:  # last SAW position finished
                 self.saw_pos_counter = 0
+                #  move MV after SAW is finished with analysis of one trial
+                self._move_mw(new_t_start=self.trigger_event[self.tw_counter] + self.tw_size)
+                # reset bw
+                self.bw = np.zeros_like(self.bw)
                 if self.tw_counter < len(self.trigger_event)-1:
                     self.tw_counter += 1
                 print(f"tw_counter = {self.tw_counter}")        # DEBUG-aid
-                #  move MV after SAW is finished with analysis of one trial
-                self._move_mw(overlap=self.ew_pre_size + self.saw_size/2,
-                              t_stop=t_stop_idw)
-                # reset bw
-                self.bw = np.zeros_like(self.bw)
 
     def update_uea(self, spiketrains):
         """Update unitary events analysis UEA with new arriving spike data."""
@@ -406,8 +403,7 @@ class OnlineUnitaryEventAnalysis:
                     pass
             # # subcase 2: IDW does not contain trigger event
             else:
-                self._move_mw(overlap=self.ew_pre_size + self.saw_size / 2,
-                              t_stop=idw_t_stop)
+                self._move_mw(new_t_start=idw_t_stop-self.ew_pre_size)
 
         # # Case 2: within trial analysis,
         # i.e. waiting for new IDW with spikes of current trial
