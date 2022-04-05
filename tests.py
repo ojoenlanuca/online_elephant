@@ -287,6 +287,18 @@ def _generate_spiketrains(freq, length, ts_events, injection_pos):
     return st1, st2
 
 
+def _visualize_results_of_offline_and_online_uea(
+        spiketrains, ue_dict_offline, ue_dict_online, alpha):
+    viziphant.unitary_event_analysis.plot_ue(
+        spiketrains, Js_dict=ue_dict_offline, significance_level=alpha,
+        unit_real_ids=['1', '2'])
+    plt.show()
+    viziphant.unitary_event_analysis.plot_ue(
+        spiketrains, Js_dict=ue_dict_online, significance_level=alpha,
+        unit_real_ids=['1', '2'])
+    plt.show()
+
+
 class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -377,14 +389,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                     desired=ue_dict["input_parameters"][key])
 
         # visualize results of online and standard UEA for artifical data
-        # viziphant.unitary_event_analysis.plot_ue(
-        #     spiketrains, Js_dict=ue_dict, significance_level=0.01,
-        #     unit_real_ids=['1', '2'])
-        # plt.show()
-        # viziphant.unitary_event_analysis.plot_ue(
-        #     spiketrains, Js_dict=ue_dict_online, significance_level=0.01,
-        #     unit_real_ids=['1', '2'])
-        # plt.show()
+        _visualize_results_of_offline_and_online_uea(
+            spiketrains=spiketrains, ue_dict_offline=ue_dict,
+            ue_dict_online=ue_dict_online, alpha=0.01)
 
     def test_TW_larger_IDW_real_data(self):
         """Test, if online UE analysis is correct when the trial window is
@@ -493,14 +500,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                     desired=ue_dict["input_parameters"][key])
 
         # visualize results of online and standard UEA for real data
-        # viziphant.unitary_event_analysis.plot_ue(
-        #     spiketrains, Js_dict=ue_dict, significance_level=0.05,
-        #     unit_real_ids=['1', '2'])
-        # plt.show()
-        # viziphant.unitary_event_analysis.plot_ue(
-        #     spiketrains, Js_dict=ue_dict_online, significance_level=0.05,
-        #     unit_real_ids=['1', '2'])
-        # plt.show()
+        _visualize_results_of_offline_and_online_uea(
+            spiketrains=spiketrains, ue_dict_offline=ue_dict,
+            ue_dict_online=ue_dict_online, alpha=0.05)
 
     # test: trial window = in-coming data window    (TW = IDW)
     # test: trial window < in-coming data window    (TW < IDW)
