@@ -264,7 +264,8 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
                                    rtol=self.rtol, atol=self.atol)
 
 
-def _generate_spiketrains(freq, length, ts_events, injection_pos, tw_length):
+def _generate_spiketrains(freq, length, trigger_events, injection_pos, trigger_pre_size,
+                          trigger_post_size):
     """
     Generate two spiketrains from an homogeneous Poisson process with
     injected coincideces.
@@ -276,7 +277,7 @@ def _generate_spiketrains(freq, length, ts_events, injection_pos, tw_length):
     # inject 10 coincidences within a 0.1s interval for each trial
     injection = np.linspace(0, 0.1, 10)*pq.s
     all_injections = np.array([])
-    for i in ts_events:
+    for i in trigger_events:
         all_injections = np.concatenate(
             (all_injections, (i+injection_pos)+injection), axis=0) * pq.s
     st1 = st1.duplicate_with_new_data(
@@ -286,13 +287,13 @@ def _generate_spiketrains(freq, length, ts_events, injection_pos, tw_length):
 
     # stack spiketrains by trial
     st1_stacked = [st1.time_slice(
-        t_start=i - tw_length / 2,
-        t_stop=i + tw_length / 2).time_shift(-i + tw_length / 2)
-                   for i in ts_events]
+        t_start=i - trigger_pre_size,
+        t_stop=i + trigger_post_size).time_shift(-i + trigger_pre_size)
+                   for i in trigger_events]
     st2_stacked = [st2.time_slice(
-        t_start=i - tw_length / 2,
-        t_stop=i + tw_length / 2).time_shift(-i + tw_length / 2)
-                   for i in ts_events]
+        t_start=i - trigger_pre_size,
+        t_stop=i + trigger_post_size).time_shift(-i + trigger_pre_size)
+                   for i in trigger_events]
     spiketrains = np.stack((st1_stacked, st2_stacked), axis=1)
 
     return spiketrains, st1, st2
@@ -424,13 +425,18 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     def test_TW_larger_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
         larger than the in-coming data window with artifical data."""
+        # Fix random seed to guarantee fixed output
+        random.seed(1224)
+
         # set relevant variables of this TestCase
         n_trials = 40
         TW_length = 1 * pq.s  # sec
         noise_length = 1.5 * pq.s
-        # DEBUG-info: IDW_length = 0.9s, 0.8s 0k; fails for <=0.7s in 0.1s steps
+        # DEBUG-info: IDW_length = 0.8s, 0.1s, 0.05s successfully pass test
         IDW_length = 0.8 * pq.s  # sec
-        TS_events = np.arange(0.5, n_trials*2.5, 2.5)*pq.s
+        trigger_events = np.arange(0., n_trials*2.5, 2.5)*pq.s
+        trigger_pre_size = 0. * pq.s
+        trigger_post_size = 1. * pq.s
         n_buffers, length_remainder = _calculate_n_buffers(
             n_trials=n_trials, tw_length=TW_length,
             noise_length=noise_length, idw_length=IDW_length)
@@ -438,8 +444,10 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # create two long random homogeneous poisson spiketrains which represent
         # 40 trials with 1s length and 1.5s background noise in between trials
         spiketrains, st1_long, st2_long = _generate_spiketrains(
-            freq=5*pq.Hz, length=IDW_length * n_buffers,
-            ts_events=TS_events, injection_pos=0.1*pq.s, tw_length=TW_length)
+            freq=5*pq.Hz, length=(TW_length+noise_length)*n_trials,
+            trigger_events=trigger_events, injection_pos=0.6 * pq.s,
+            trigger_pre_size=trigger_pre_size,
+            trigger_post_size=trigger_post_size)
 
         # perform standard unitary event analysis
         ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
@@ -448,10 +456,10 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
-            bw_size=0.005*pq.s, ew_pre_size=0.5*pq.s,
-            ew_post_size=0.5*pq.s, idw_size=IDW_length,
+            bw_size=0.005*pq.s, trigger_pre_size=trigger_pre_size,
+            trigger_post_size=trigger_post_size, idw_size=IDW_length,
             saw_size=0.1*pq.s, saw_step=0.005*pq.s,
-            mw_size=2.5*IDW_length, trigger_event=TS_events)
+            mw_size=2.5*IDW_length, trigger_event=trigger_events)
         # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
@@ -480,7 +488,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # set relevant variables of this TestCase
         n_trials = 36                       # determinded by real data
         TW_length = 2.1 * pq.s  # sec       # determinded by real data
-        IDW_length = 1 * pq.s  # sec
+        # DEBUG-info: IDW_length = 0.8s, 0.1s, 0.05s successfully pass test
+        IDW_length = 0.8 * pq.s  # sec
         noise_length = 0. * pq.s
         TS_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
         n_buffers, length_remainder = _calculate_n_buffers(
@@ -500,8 +509,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
-            bw_size=0.005 * pq.s, ew_pre_size=0. * pq.s,
-            ew_post_size=2.1 * pq.s, idw_size=IDW_length,
+            bw_size=0.005 * pq.s, trigger_pre_size=0. * pq.s,
+            trigger_post_size=2.1 * pq.s, idw_size=IDW_length,
             saw_size=0.1 * pq.s, saw_step=0.005 * pq.s,
             mw_size=2.5 * IDW_length, trigger_event=TS_events)
         # perform online unitary events analysis

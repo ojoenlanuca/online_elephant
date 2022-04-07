@@ -163,8 +163,8 @@ class OnlinePearsonCorrelationCoefficient:
 
 
 class OnlineUnitaryEventAnalysis:
-    def __init__(self, bw_size=0.005 * pq.s, ew_pre_size=0.5 * pq.s,
-                 ew_post_size=0.5 * pq.s, idw_size=1 * pq.s,
+    def __init__(self, bw_size=0.005 * pq.s, trigger_pre_size=0.5 * pq.s,
+                 trigger_post_size=0.5 * pq.s, idw_size=1 * pq.s,
                  saw_size=0.1 * pq.s, saw_step=0.005*pq.s, mw_size=3,
                  trigger_event=None, n_neurons=2, pattern_hash=None):
         """
@@ -178,11 +178,11 @@ class OnlineUnitaryEventAnalysis:
         """
         self.time_unit = 1 * pq.s
         self.n_neurons = n_neurons
-        self.tw_size = ew_pre_size + ew_post_size
+        self.tw_size = trigger_pre_size + trigger_post_size
         self.tw = [[] for _ in range(self.n_neurons)]  # pointer to slice of mw
         self.tw_counter = 0
-        self.ew_pre_size = ew_pre_size
-        self.ew_post_size = ew_post_size
+        self.trigger_pre_size = trigger_pre_size
+        self.trigger_post_size = trigger_post_size
         # self.idw_size = idw_size  # TODO: unused now, but needed in future?
         self.saw_size = saw_size  # multiple of bw_size
         self.saw_step = saw_step  # multiple of bw_size
@@ -262,8 +262,8 @@ class OnlineUnitaryEventAnalysis:
 
     def _define_tw(self, trigger_event):
         """Define trial window (TW) based on a trigger event."""
-        self.trial_start = trigger_event - self.ew_pre_size
-        self.trial_stop = trigger_event + self.ew_post_size
+        self.trial_start = trigger_event - self.trigger_pre_size
+        self.trial_stop = trigger_event + self.trigger_post_size
         for i in range(self.n_neurons):
             # TODO: use a slicing view of mw instead of creating a new list
             self.tw[i] = [t for t in self.mw[i]
@@ -271,8 +271,8 @@ class OnlineUnitaryEventAnalysis:
 
     def _check_tw_overlap(self, current_trigger_event, next_trigger_event):
         """Check if successive trials do overlap each other."""
-        if current_trigger_event + self.ew_post_size > \
-                next_trigger_event - self.ew_pre_size:
+        if current_trigger_event + self.trigger_post_size > \
+                next_trigger_event - self.trigger_pre_size:
             return True
         else:
             return False
@@ -361,6 +361,9 @@ class OnlineUnitaryEventAnalysis:
                 self.bw = np.zeros_like(self.bw)
                 if self.tw_counter < len(self.trigger_event)-1:
                     self.tw_counter += 1
+                else:
+                    self.waiting_for_new_trigger = True
+                    self.trigger_events_left_over = False
                 print(f"tw_counter = {self.tw_counter}")        # DEBUG-aid
 
     def update_uea(self, spiketrains):
@@ -403,7 +406,7 @@ class OnlineUnitaryEventAnalysis:
                     pass
             # # subcase 2: IDW does not contain trigger event
             else:
-                self._move_mw(new_t_start=idw_t_stop-self.ew_pre_size)
+                self._move_mw(new_t_start=idw_t_stop-self.trigger_pre_size)
 
         # # Case 2: within trial analysis,
         # i.e. waiting for new IDW with spikes of current trial
