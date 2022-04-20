@@ -366,7 +366,7 @@ def _calculate_n_buffers(n_trials, tw_length, noise_length, idw_length):
     _n_buffers_int = int(_n_buffers_float)
     _n_buffers_fraction = _n_buffers_float - _n_buffers_int
     n_buffers = _n_buffers_int + 1 if _n_buffers_fraction > 1e-7 else _n_buffers_int
-    length_remainder = _n_buffers_fraction * pq.s
+    length_remainder = idw_length * _n_buffers_fraction
     return n_buffers, length_remainder
 
 
@@ -421,75 +421,15 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                     actual=ue_dict_online["input_parameters"][key],
                     desired=ue_dict_offline["input_parameters"][key])
 
-    # test: trial window > in-coming data window    (TW > IDW)
-    def test_TW_larger_IDW_artificial_data(self):
-        """Test, if online UE analysis is correct when the trial window is
-        larger than the in-coming data window with artifical data."""
+    def _test_unitary_events_analysis_with_real_data(self, idw_length):
         # Fix random seed to guarantee fixed output
         random.seed(1224)
 
         # set relevant variables of this TestCase
-        n_trials = 40
-        TW_length = 1 * pq.s  # sec
-        noise_length = 1.5 * pq.s
+        n_trials = 36  # determined by real data
+        TW_length = 2.1 * pq.s  # sec       # determined by real data
         # DEBUG-info: IDW_length = 0.8s, 0.1s, 0.05s successfully pass test
-        IDW_length = 0.8 * pq.s  # sec
-        trigger_events = np.arange(0., n_trials*2.5, 2.5)*pq.s
-        trigger_pre_size = 0. * pq.s
-        trigger_post_size = 1. * pq.s
-        n_buffers, length_remainder = _calculate_n_buffers(
-            n_trials=n_trials, tw_length=TW_length,
-            noise_length=noise_length, idw_length=IDW_length)
-
-        # create two long random homogeneous poisson spiketrains which represent
-        # 40 trials with 1s length and 1.5s background noise in between trials
-        spiketrains, st1_long, st2_long = _generate_spiketrains(
-            freq=5*pq.Hz, length=(TW_length+noise_length)*n_trials,
-            trigger_events=trigger_events, injection_pos=0.6 * pq.s,
-            trigger_pre_size=trigger_pre_size,
-            trigger_post_size=trigger_post_size)
-
-        # perform standard unitary event analysis
-        ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
-                                         win_size=100*pq.ms, win_step=5*pq.ms)
-
-        # create instance of OnlineUnitaryEventAnalysis
-        # TODO: use one pyhsical unit as standard and rescale others accordingly
-        ouea = OnlineUnitaryEventAnalysis(
-            bw_size=0.005*pq.s, trigger_pre_size=trigger_pre_size,
-            trigger_post_size=trigger_post_size, idw_size=IDW_length,
-            saw_size=0.1*pq.s, saw_step=0.005*pq.s,
-            mw_size=2.5*IDW_length, trigger_event=trigger_events)
-        # perform online unitary event analysis
-        # simulate buffered reading/transport of spiketrains,
-        # i.e. loop over spiketrain list and call update_ue()
-        _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=st1_long,
-                                   st2=st2_long, IDW_length=IDW_length,
-                                   length_remainder=length_remainder)
-        ue_dict_online = ouea.get_results()
-
-        # assert equality between result dicts of standard and online ue version
-        self._assert_equality_of_result_dicts(
-            ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
-            tol_dict_user={"atol_n_exp": 5e-5})
-        # fixme: larger atol ok?
-
-        # visualize results of online and standard UEA for artifical data
-        _visualize_results_of_offline_and_online_uea(
-            spiketrains=spiketrains, ue_dict_offline=ue_dict,
-            ue_dict_online=ue_dict_online, alpha=0.01)
-
-    def test_TW_larger_IDW_real_data(self):
-        """Test, if online UE analysis is correct when the trial window is
-                larger than the in-coming data window with real data."""
-        # Fix random seed to guarantee fixed output
-        random.seed(1224)
-
-        # set relevant variables of this TestCase
-        n_trials = 36                       # determinded by real data
-        TW_length = 2.1 * pq.s  # sec       # determinded by real data
-        # DEBUG-info: IDW_length = 0.8s, 0.1s, 0.05s successfully pass test
-        IDW_length = 0.8 * pq.s  # sec
+        IDW_length = idw_length  # sec
         noise_length = 0. * pq.s
         TS_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
         n_buffers, length_remainder = _calculate_n_buffers(
@@ -533,8 +473,90 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             spiketrains=spiketrains, ue_dict_offline=ue_dict,
             ue_dict_online=ue_dict_online, alpha=0.05)
 
+    def _test_unitary_events_analysis_with_artificial_data(self, idw_length):
+        # Fix random seed to guarantee fixed output
+        random.seed(1224)
+
+        # set relevant variables of this TestCase
+        n_trials = 40
+        TW_length = 1 * pq.s  # sec
+        noise_length = 1.5 * pq.s
+        IDW_length = idw_length  # sec
+        trigger_events = np.arange(0., n_trials*2.5, 2.5)*pq.s
+        trigger_pre_size = 0. * pq.s
+        trigger_post_size = 1. * pq.s
+        n_buffers, length_remainder = _calculate_n_buffers(
+            n_trials=n_trials, tw_length=TW_length,
+            noise_length=noise_length, idw_length=IDW_length)
+
+        # create two long random homogeneous poisson spiketrains which represent
+        # 40 trials with 1s length and 1.5s background noise in between trials
+        spiketrains, st1_long, st2_long = _generate_spiketrains(
+            freq=5*pq.Hz, length=(TW_length+noise_length)*n_trials,
+            trigger_events=trigger_events, injection_pos=0.6 * pq.s,
+            trigger_pre_size=trigger_pre_size,
+            trigger_post_size=trigger_post_size)
+
+        # perform standard unitary event analysis
+        ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
+                                         win_size=100*pq.ms, win_step=5*pq.ms)
+
+        # create instance of OnlineUnitaryEventAnalysis
+        # TODO: use one pyhsical unit as standard and rescale others accordingly
+        ouea = OnlineUnitaryEventAnalysis(
+            bw_size=0.005*pq.s, trigger_pre_size=trigger_pre_size,
+            trigger_post_size=trigger_post_size, idw_size=IDW_length,
+            saw_size=0.1*pq.s, saw_step=0.005*pq.s,
+            mw_size=2.5*IDW_length, trigger_event=trigger_events)
+        # perform online unitary event analysis
+        # simulate buffered reading/transport of spiketrains,
+        # i.e. loop over spiketrain list and call update_ue()
+        _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=st1_long,
+                                   st2=st2_long, IDW_length=IDW_length,
+                                   length_remainder=length_remainder)
+        ue_dict_online = ouea.get_results()
+
+        # assert equality between result dicts of standard and online ue version
+        self._assert_equality_of_result_dicts(
+            ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
+            tol_dict_user={"atol_n_exp": 5e-5, "atol_Js": 2e-7})
+        # fixme: larger atol ok?
+
+        # visualize results of online and standard UEA for artifical data
+        _visualize_results_of_offline_and_online_uea(
+            spiketrains=spiketrains, ue_dict_offline=ue_dict,
+            ue_dict_online=ue_dict_online, alpha=0.01)
+
+    # test: trial window > in-coming data window    (TW > IDW)
+    def test_TW_larger_IDW_artificial_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+        larger than the in-coming data window with artifical data."""
+        # DEBUG-info: IDW_length = 0.995s, 0.8s, 0.6s, 0.3s, 0.1s, 0.05s
+        # successfully pass test
+
+        idw_length = [0.995, 0.8, 0.6, 0.3, 0.1, 0.05] * pq.s
+        for idw in idw_length:
+            with self.subTest(f"IDW = {idw}"):
+                self._test_unitary_events_analysis_with_artificial_data(
+                    idw_length=idw)
+
+    def test_TW_larger_IDW_real_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+                larger than the in-coming data window with real data."""
+        # DEBUG-info: IDW_length = 2.05s, 2.s, 1.1s, 0.8s, 0.1s, 0.05s
+        # successfully pass test
+
+        idw_length = [2.05, 2., 1.1, 0.8, 0.1, 0.05] * pq.s
+        for idw in idw_length:
+            with self.subTest(f"IDW = {idw}"):
+                self._test_unitary_events_analysis_with_real_data(
+                    idw_length=idw)
+
     # test: trial window = in-coming data window    (TW = IDW)
+        # DEBUG-info: IDW_length = 2.1s fails test (for real data with TW=2.1s)
+
     # test: trial window < in-coming data window    (TW < IDW)
+        # DEBUG-info: IDW_length = 2.2s fails test (for real data with TW=2.1s)
 
 
 if __name__ == '__main__':
