@@ -469,9 +469,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # fixme: larger atol & rtol ok?
 
         # visualize results of online and standard UEA for real data
-        _visualize_results_of_offline_and_online_uea(
-            spiketrains=spiketrains, ue_dict_offline=ue_dict,
-            ue_dict_online=ue_dict_online, alpha=0.05)
+        # _visualize_results_of_offline_and_online_uea(
+        #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
+        #     ue_dict_online=ue_dict_online, alpha=0.05)
 
     def _test_unitary_events_analysis_with_artificial_data(self, idw_length):
         # Fix random seed to guarantee fixed output
@@ -519,44 +519,74 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # assert equality between result dicts of standard and online ue version
         self._assert_equality_of_result_dicts(
             ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
-            tol_dict_user={"atol_n_exp": 5e-5, "atol_Js": 2e-7})
+            tol_dict_user={"atol_n_exp": 5e-5, "atol_Js": 3e-6, "rtol_Js": 2e-5})
         # fixme: larger atol ok?
 
         # visualize results of online and standard UEA for artifical data
-        _visualize_results_of_offline_and_online_uea(
-            spiketrains=spiketrains, ue_dict_offline=ue_dict,
-            ue_dict_online=ue_dict_online, alpha=0.01)
+        # _visualize_results_of_offline_and_online_uea(
+        #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
+        #     ue_dict_online=ue_dict_online, alpha=0.01)
 
     # test: trial window > in-coming data window    (TW > IDW)
     def test_TW_larger_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
-        larger than the in-coming data window with artifical data."""
-        # DEBUG-info: IDW_length = 0.995s, 0.8s, 0.6s, 0.3s, 0.1s, 0.05s
-        # successfully pass test
-
+        larger than the in-coming data window with artificial data."""
         idw_length = [0.995, 0.8, 0.6, 0.3, 0.1, 0.05] * pq.s
         for idw in idw_length:
             with self.subTest(f"IDW = {idw}"):
                 self._test_unitary_events_analysis_with_artificial_data(
                     idw_length=idw)
+                self.doCleanups()
 
     def test_TW_larger_IDW_real_data(self):
         """Test, if online UE analysis is correct when the trial window is
                 larger than the in-coming data window with real data."""
-        # DEBUG-info: IDW_length = 2.05s, 2.s, 1.1s, 0.8s, 0.1s, 0.05s
-        # successfully pass test
-
         idw_length = [2.05, 2., 1.1, 0.8, 0.1, 0.05] * pq.s
         for idw in idw_length:
             with self.subTest(f"IDW = {idw}"):
                 self._test_unitary_events_analysis_with_real_data(
                     idw_length=idw)
+                self.doCleanups()
 
     # test: trial window = in-coming data window    (TW = IDW)
-        # DEBUG-info: IDW_length = 2.1s fails test (for real data with TW=2.1s)
+    def test_TW_as_large_as_IDW_real_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+                as large as the in-coming data window with real data."""
+        idw_length = 2.1 * pq.s
+        with self.subTest(f"IDW = {idw_length}"):
+            self._test_unitary_events_analysis_with_real_data(
+                idw_length=idw_length)
+            self.doCleanups()
+
+    def test_TW_as_large_as_IDW_artificial_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+                as large as the in-coming data window with artificial data."""
+        idw_length = 1 * pq.s
+        with self.subTest(f"IDW = {idw_length}"):
+            self._test_unitary_events_analysis_with_artificial_data(
+                idw_length=idw_length)
+            self.doCleanups()
 
     # test: trial window < in-coming data window    (TW < IDW)
-        # DEBUG-info: IDW_length = 2.2s fails test (for real data with TW=2.1s)
+    def test_TW_smaller_IDW_artificial_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+        smaller than the in-coming data window with artificial data."""
+        idw_length = [1.05, 1.1, 2, 10, 50, 100] * pq.s
+        for idw in idw_length:
+            with self.subTest(f"IDW = {idw}"):
+                self._test_unitary_events_analysis_with_artificial_data(
+                    idw_length=idw)
+                self.doCleanups()
+
+    def test_TW_smaller_IDW_real_data(self):
+        """Test, if online UE analysis is correct when the trial window is
+                smaller than the in-coming data window with real data."""
+        idw_length = [2.15, 2.2, 3, 10, 50, 75.6] * pq.s
+        for idw in idw_length:
+            with self.subTest(f"IDW = {idw}"):
+                self._test_unitary_events_analysis_with_real_data(
+                    idw_length=idw)
+                self.doCleanups()
 
 
 if __name__ == '__main__':

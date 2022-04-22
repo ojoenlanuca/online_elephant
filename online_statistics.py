@@ -176,6 +176,7 @@ class OnlineUnitaryEventAnalysis:
         idw = incoming data window
         mw = memory window
         """
+        self.data_available_in_mv = None
         self.time_unit = 1 * pq.s
         self.n_neurons = n_neurons
         self.tw_size = trigger_pre_size + trigger_post_size
@@ -258,6 +259,7 @@ class OnlineUnitaryEventAnalysis:
             if not len(idx) == 0:  # move mv
                 self.mw[i] = self.mw[i][idx[0]:idx[-1]+1]
             else:  # keep mv
+                self.data_available_in_mv = False
                 pass
 
     def _define_tw(self, trigger_event):
@@ -343,6 +345,10 @@ class OnlineUnitaryEventAnalysis:
                 Js_win, rate_avg, n_exp_win, n_emp_win, indices_lst = _UE(
                     mat_win, pattern_hash=self.pattern_hash,
                     method=self.method, n_surrogates=self.n_surrogates)
+                # if i == 0:                                # DEBUG-aid
+                #     print(f"trial = {self.tw_counter}     # DEBUG-aid
+                #     sum = {rate_avg * (self.saw_size/     # DEBUG-aid
+                #     self.bw_size )}")                     # DEBUG-aid
                 self.rate_avg[i] += rate_avg
                 self.n_exp_win[i] += n_exp_win
                 self.n_emp_win[i] += n_emp_win
@@ -352,11 +358,13 @@ class OnlineUnitaryEventAnalysis:
                         self.indices_lst[0] + p_bintime)
             else:  # saw is empty / half-filled -> pause iteration
                 self.saw_pos_counter = i
+                self.data_available_in_mv = False
                 break
             if i == self.n_windows-1:  # last SAW position finished
                 self.saw_pos_counter = 0
                 #  move MV after SAW is finished with analysis of one trial
-                self._move_mw(new_t_start=self.trigger_event[self.tw_counter] + self.tw_size)
+                self._move_mw(new_t_start=self.trigger_event[self.tw_counter] +
+                                          self.tw_size)
                 # reset bw
                 self.bw = np.zeros_like(self.bw)
                 if self.tw_counter < len(self.trigger_event)-1:
@@ -364,6 +372,7 @@ class OnlineUnitaryEventAnalysis:
                 else:
                     self.waiting_for_new_trigger = True
                     self.trigger_events_left_over = False
+                    self.data_available_in_mv = False
                 print(f"tw_counter = {self.tw_counter}")        # DEBUG-aid
 
     def update_uea(self, spiketrains):
@@ -373,29 +382,73 @@ class OnlineUnitaryEventAnalysis:
         # extract relevant time informations
         idw_t_start = spiketrains[0].t_start
         idw_t_stop = spiketrains[0].t_stop
-        current_trigger_event = self.trigger_event[self.tw_counter]
-        if self.tw_counter < len(self.trigger_event)-1:
-            next_trigger_event = self.trigger_event[self.tw_counter + 1]
-        else:
-            # Todo: what happens if last trigger event is consumed?
-            #  -> set next_trigger_event to inf OR wait for new trigger events
-            next_trigger_event = np.inf * pq.s
-
-        # # case 1: pre/post trial analysis,
-        # i.e. waiting for IDW  with new trigger event
-        if self.waiting_for_new_trigger:
-            # # subcase 1: IDW contains trigger event
-            if (idw_t_start <= current_trigger_event) & \
-                    (current_trigger_event <= idw_t_stop):
-                self.waiting_for_new_trigger = False
+        
+        # analyse all trials which are available in the memory
+        self.data_available_in_mv = True
+        while self.data_available_in_mv:
+            
+            current_trigger_event = self.trigger_event[self.tw_counter]
+            if self.tw_counter < len(self.trigger_event)-1:
+                next_trigger_event = self.trigger_event[self.tw_counter + 1]
+            else:
+                # Todo: what happens if last trigger event is consumed?
+                #  -> set next_trigger_event to inf OR wait for new trigger events
+                next_trigger_event = np.inf * pq.s
+    
+            # # case 1: pre/post trial analysis,
+            # i.e. waiting for IDW  with new trigger event
+            if self.waiting_for_new_trigger:
+                # # subcase 1: IDW contains trigger event
+                if (idw_t_start <= current_trigger_event) & \
+                        (current_trigger_event <= idw_t_stop):
+                    self.waiting_for_new_trigger = False
+                    if self.trigger_events_left_over:
+                        # define trial (TW) around trigger event,
+                        # i.e. trial interval ranges from:
+                        # [trigger - preEvent -SAW/2, trigger + postEvent + SAW/2]
+                        # -> TW is pointer to a slice of MW
+                        self._define_tw(trigger_event=current_trigger_event)
+                        # apply BW to available data in TW
+                        # -> BW is a binned copy of TW
+                        self._apply_bw_to_tw(
+                            spiketrains=self.tw, bin_size=self.bw_size,
+                            t_start=self.trial_start, t_stop=self.trial_stop,
+                            n_neurons=self.n_neurons)
+                        # move SAW over available data in TW
+                        self._move_saw_over_tw(t_stop_idw=idw_t_stop)
+                    else:
+                        pass
+                # # subcase 2: IDW does not contain trigger event
+                else:
+                    self._move_mw(new_t_start=idw_t_stop-self.trigger_pre_size)
+    
+            # # Case 2: within trial analysis,
+            # i.e. waiting for new IDW with spikes of current trial
+            else:
+                # # Subcase 3: IDW contains new trigger event
+                if (idw_t_start <= next_trigger_event) & \
+                        (next_trigger_event <= idw_t_stop):
+                    # check if an overlap between current / next trial range exists
+                    if self._check_tw_overlap(
+                            current_trigger_event=current_trigger_event,
+                            next_trigger_event=next_trigger_event):
+                        warnings.warn(
+                            f"Data in trial {self.tw_counter} will be analysed "
+                            f"twice! Adjust the trigger events and/or "
+                            f"the trial window size.", UserWarning)
+                    else:  # no overlap exists
+                        pass
+                # # Subcase 4: IDW does not contain trigger event,
+                # i.e. just new spikes of the current trial
+                else:
+                    pass
                 if self.trigger_events_left_over:
                     # define trial (TW) around trigger event,
                     # i.e. trial interval ranges from:
-                    # [trigger - preEvent -SAW/2, trigger + postEvent + SAW/2]
+                    # [trigger - preEvent -SAW/w, trigger + postEvent + SAW/2]
                     # -> TW is pointer to a slice of MW
                     self._define_tw(trigger_event=current_trigger_event)
-                    # apply BW to available data in TW
-                    # -> BW is a binned copy of TW
+                    # apply BW to available data in TW; -> BW is a binned copy of TW
                     self._apply_bw_to_tw(
                         spiketrains=self.tw, bin_size=self.bw_size,
                         t_start=self.trial_start, t_stop=self.trial_stop,
@@ -404,42 +457,3 @@ class OnlineUnitaryEventAnalysis:
                     self._move_saw_over_tw(t_stop_idw=idw_t_stop)
                 else:
                     pass
-            # # subcase 2: IDW does not contain trigger event
-            else:
-                self._move_mw(new_t_start=idw_t_stop-self.trigger_pre_size)
-
-        # # Case 2: within trial analysis,
-        # i.e. waiting for new IDW with spikes of current trial
-        else:
-            # # Subcase 3: IDW contains new trigger event
-            if (idw_t_start <= next_trigger_event) & \
-                    (next_trigger_event <= idw_t_stop):
-                # check if an overlap between current / next trial range exists
-                if self._check_tw_overlap(
-                        current_trigger_event=current_trigger_event,
-                        next_trigger_event=next_trigger_event):
-                    warnings.warn(
-                        f"Data in trial {self.tw_counter} will be analysed "
-                        f"twice! Adjust the trigger events and/or "
-                        f"the trial window size.", UserWarning)
-                else:  # no overlap exists
-                    pass
-            # # Subcase 4: IDW does not contain trigger event,
-            # i.e. just new spikes of the current trial
-            else:
-                pass
-            if self.trigger_events_left_over:
-                # define trial (TW) around trigger event,
-                # i.e. trial interval ranges from:
-                # [trigger - preEvent -SAW/w, trigger + postEvent + SAW/2]
-                # -> TW is pointer to a slice of MW
-                self._define_tw(trigger_event=current_trigger_event)
-                # apply BW to available data in TW; -> BW is a binned copy of TW
-                self._apply_bw_to_tw(
-                    spiketrains=self.tw, bin_size=self.bw_size,
-                    t_start=self.trial_start, t_stop=self.trial_stop,
-                    n_neurons=self.n_neurons)
-                # move SAW over available data in TW
-                self._move_saw_over_tw(t_stop_idw=idw_t_stop)
-            else:
-                pass
