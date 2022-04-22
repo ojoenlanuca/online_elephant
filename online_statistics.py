@@ -11,6 +11,8 @@ from elephant.statistics import mean_firing_rate, isi
 from elephant.unitary_event_analysis import *
 from elephant.unitary_event_analysis import _winpos, _bintime, _UE
 
+from utils import round_to_nearest_fraction_multiple
+
 
 class OnlineMeanFiringRate:
     def __init__(self, buffer_size=1):
@@ -228,6 +230,8 @@ class OnlineUnitaryEventAnalysis:
         """Return result dictionary."""
         for key in self.indices_win.keys():
             self.indices_win[key] = np.hstack(self.indices_win[key]).flatten()
+        ratio_of_bw_to_saw = np.divide(self.bw_size, self.saw_size, dtype=np.float64).magnitude
+        self.n_exp_win = round_to_nearest_fraction_multiple(self.n_exp_win, ratio_of_bw_to_saw)
         p = self._pval(self.n_emp_win, self.n_exp_win).flatten()
         self.Js_win = jointJ(p)
         return {
@@ -236,7 +240,7 @@ class OnlineUnitaryEventAnalysis:
             'n_emp': self.n_emp_win.reshape((len(self.n_emp_win), 1)),
             'n_exp': self.n_exp_win.reshape((len(self.n_exp_win), 1)),
             'rate_avg':
-                self.rate_avg.reshape((len(self.rate_avg), 1, 2)) / (self.bw_size.rescale(pq.ms) * self.n_trials),
+                self.rate_avg.reshape((len(self.rate_avg), 1, 2)) / (self.saw_size.rescale(pq.ms) * self.n_trials),
             'input_parameters': self.input_parameters}
 
     def _pval(self, n_emp, n_exp):
@@ -349,7 +353,7 @@ class OnlineUnitaryEventAnalysis:
                 #     print(f"trial = {self.tw_counter}     # DEBUG-aid
                 #     sum = {rate_avg * (self.saw_size/     # DEBUG-aid
                 #     self.bw_size )}")                     # DEBUG-aid
-                self.rate_avg[i] += rate_avg
+                self.rate_avg[i] += rate_avg * (self.saw_size / self.bw_size)
                 self.n_exp_win[i] += n_exp_win
                 self.n_emp_win[i] += n_emp_win
                 self.indices_lst = indices_lst

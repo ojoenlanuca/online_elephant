@@ -329,6 +329,12 @@ def _simulate_buffered_reading(n_buffers, ouea, st1, st2, IDW_length,
                     st2.time_slice(t_start=i * IDW_length,
                                    t_stop=i * IDW_length + IDW_length)])
         print(f"#buffer = {i}")  # DEBUG-aid
+        # # aid to create timelapses
+        # result_dict = ouea.get_results()
+        # viziphant.unitary_event_analysis.plot_ue(
+        #     spiketrains[:i+1], Js_dict=result_dict, significance_level=0.05,
+        #     unit_real_ids=['1', '2'])
+        # plt.savefig(f"plots/timelapse_UE/ue_real_data_buff_{i}.pdf")
 
 
 def _load_real_data(n_trials, trial_length):
@@ -464,8 +470,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # assert equality between result dicts of standard and online ue version
         self._assert_equality_of_result_dicts(
             ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
-            tol_dict_user={"atol_Js": 1e-6, "rtol_Js": 4e-5,
-                           "atol_n_exp": 3e-6, "rtol_n_exp": 3e-7})
+            tol_dict_user={})
         # fixme: larger atol & rtol ok?
 
         # visualize results of online and standard UEA for real data
@@ -519,7 +524,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # assert equality between result dicts of standard and online ue version
         self._assert_equality_of_result_dicts(
             ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
-            tol_dict_user={"atol_n_exp": 5e-5, "atol_Js": 3e-6, "rtol_Js": 2e-5})
+            tol_dict_user={})
         # fixme: larger atol ok?
 
         # visualize results of online and standard UEA for artifical data
