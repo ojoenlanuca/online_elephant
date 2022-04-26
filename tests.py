@@ -386,11 +386,13 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
 
     def _assert_equality_of_result_dicts(self, ue_dict_offline, ue_dict_online,
                                          tol_dict_user):
-        tol_dict = {"atol_Js": 1e-7, "rtol_Js": 1e-7,
-                    "atol_indices": 1e-7, "rtol_indices": 1e-7,
-                    "atol_n_emp": 1e-7, "rtol_n_emp": 1e-7,
-                    "atol_n_exp": 1e-7, "rtol_n_exp": 1e-7,
-                    "atol_rate_avg": 1e-7, "rtol_rate_avg": 1e-7}
+        eps_float64 = np.finfo(np.float64).eps
+        eps_float32 = np.finfo(np.float32).eps
+        tol_dict = {"atol_Js": eps_float64, "rtol_Js": eps_float64,
+                    "atol_indices": eps_float64, "rtol_indices": eps_float64,
+                    "atol_n_emp": eps_float64, "rtol_n_emp": eps_float64,
+                    "atol_n_exp": eps_float64, "rtol_n_exp": eps_float64,
+                    "atol_rate_avg": eps_float32, "rtol_rate_avg": eps_float32}
         tol_dict.update(tol_dict_user)
 
         with self.subTest("test 'Js' equality"):

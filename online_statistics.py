@@ -221,26 +221,27 @@ class OnlineUnitaryEventAnalysis:
         self.n_windows = int(np.round(
             (self.tw_size-self.saw_size+self.saw_step) / self.saw_step))
         self.Js_win, self.n_exp_win, self.n_emp_win = np.zeros(
-            (3, self.n_windows, self.n_hashes), dtype=np.float32)
+            (3, self.n_windows, self.n_hashes), dtype=np.float64)
         self.rate_avg = np.zeros(
-            (self.n_windows, self.n_hashes, self.n_neurons), dtype=np.float32)
+            (self.n_windows, self.n_hashes, self.n_neurons), dtype=np.float64)
         self.indices_win = defaultdict(list)
 
     def get_results(self):
         """Return result dictionary."""
         for key in self.indices_win.keys():
             self.indices_win[key] = np.hstack(self.indices_win[key]).flatten()
-        ratio_of_bw_to_saw = np.divide(self.bw_size, self.saw_size, dtype=np.float64).magnitude
-        self.n_exp_win = round_to_nearest_fraction_multiple(self.n_exp_win, ratio_of_bw_to_saw)
-        p = self._pval(self.n_emp_win, self.n_exp_win).flatten()
+        self.n_exp_win /= (self.saw_size / self.bw_size)
+        p = self._pval(self.n_emp_win.astype(np.float64),
+                       self.n_exp_win.astype(np.float64)).flatten()
         self.Js_win = jointJ(p)
+        self.rate_avg = (self.rate_avg * (self.saw_size / self.bw_size)) / \
+                        (self.saw_size.rescale(pq.ms) * self.n_trials)
         return {
-            'Js': self.Js_win.reshape((len(self.Js_win), 1)),
+            'Js': self.Js_win.reshape((len(self.Js_win), 1)).astype(np.float32),
             'indices': self.indices_win,
-            'n_emp': self.n_emp_win.reshape((len(self.n_emp_win), 1)),
-            'n_exp': self.n_exp_win.reshape((len(self.n_exp_win), 1)),
-            'rate_avg':
-                self.rate_avg.reshape((len(self.rate_avg), 1, 2)) / (self.saw_size.rescale(pq.ms) * self.n_trials),
+            'n_emp': self.n_emp_win.reshape((len(self.n_emp_win), 1)).astype(np.float32),
+            'n_exp': self.n_exp_win.reshape((len(self.n_exp_win), 1)).astype(np.float32),
+            'rate_avg': self.rate_avg.reshape((len(self.rate_avg), 1, 2)).astype(np.float32),
             'input_parameters': self.input_parameters}
 
     def _pval(self, n_emp, n_exp):
@@ -353,8 +354,8 @@ class OnlineUnitaryEventAnalysis:
                 #     print(f"trial = {self.tw_counter}     # DEBUG-aid
                 #     sum = {rate_avg * (self.saw_size/     # DEBUG-aid
                 #     self.bw_size )}")                     # DEBUG-aid
-                self.rate_avg[i] += rate_avg * (self.saw_size / self.bw_size)
-                self.n_exp_win[i] += n_exp_win
+                self.rate_avg[i] += rate_avg
+                self.n_exp_win[i] += (np.round(n_exp_win * (self.saw_size / self.bw_size))).astype(int)
                 self.n_emp_win[i] += n_emp_win
                 self.indices_lst = indices_lst
                 if len(self.indices_lst[0]) > 0:
