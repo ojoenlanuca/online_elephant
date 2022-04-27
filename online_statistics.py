@@ -168,7 +168,7 @@ class OnlineUnitaryEventAnalysis:
     def __init__(self, bw_size=0.005 * pq.s, trigger_pre_size=0.5 * pq.s,
                  trigger_post_size=0.5 * pq.s, idw_size=1 * pq.s,
                  saw_size=0.1 * pq.s, saw_step=0.005*pq.s, mw_size=3,
-                 trigger_event=None, n_neurons=2, pattern_hash=None):
+                 trigger_events=None, n_neurons=2, pattern_hash=None):
         """
         Abbreviations:
         bw = bin window
@@ -198,8 +198,8 @@ class OnlineUnitaryEventAnalysis:
         # self.memory_counter = 0  # TODO: unused now, but needed in future?
         # for the moment it is assumed, that the trigger events are known
         # in advance of the simulation/experiment
-        self.trigger_event = trigger_event  # list of trigger events
-        self.n_trials = len(trigger_event)
+        self.trigger_events = trigger_events.tolist()  # list of trigger events
+        self.n_trials = len(trigger_events)
         self.waiting_for_new_trigger = True
         self.trigger_events_left_over = True
         if pattern_hash is None:
@@ -368,11 +368,11 @@ class OnlineUnitaryEventAnalysis:
             if i == self.n_windows-1:  # last SAW position finished
                 self.saw_pos_counter = 0
                 #  move MV after SAW is finished with analysis of one trial
-                self._move_mw(new_t_start=self.trigger_event[self.tw_counter] +
+                self._move_mw(new_t_start=self.trigger_events[self.tw_counter] +
                                           self.tw_size)
                 # reset bw
                 self.bw = np.zeros_like(self.bw)
-                if self.tw_counter < len(self.trigger_event)-1:
+                if self.tw_counter <= self.n_trials - 1:
                     self.tw_counter += 1
                 else:
                     self.waiting_for_new_trigger = True
@@ -380,8 +380,16 @@ class OnlineUnitaryEventAnalysis:
                     self.data_available_in_mv = False
                 print(f"tw_counter = {self.tw_counter}")        # DEBUG-aid
 
-    def update_uea(self, spiketrains):
+    def update_uea(self, spiketrains, events=None):
         """Update unitary events analysis UEA with new arriving spike data."""
+        if events is None:
+            events = np.array([])
+        if len(events) > 0:
+            for event in events:
+                if event not in self.trigger_events:
+                    self.trigger_events.append(event)
+            self.trigger_events.sort()
+            self.n_trials = len(self.trigger_events)
         # save incoming spikes (IDW) into memory (MW)
         self._save_idw_into_mw(spiketrains)
         # extract relevant time informations
@@ -391,14 +399,17 @@ class OnlineUnitaryEventAnalysis:
         # analyse all trials which are available in the memory
         self.data_available_in_mv = True
         while self.data_available_in_mv:
-            
-            current_trigger_event = self.trigger_event[self.tw_counter]
-            if self.tw_counter < len(self.trigger_event)-1:
-                next_trigger_event = self.trigger_event[self.tw_counter + 1]
-            else:
-                # Todo: what happens if last trigger event is consumed?
-                #  -> set next_trigger_event to inf OR wait for new trigger events
+            if self.tw_counter == self.n_trials:
+                break
+            if self.n_trials == 0:
+                current_trigger_event = np.inf * pq.s
                 next_trigger_event = np.inf * pq.s
+            else:
+                current_trigger_event = self.trigger_events[self.tw_counter]
+                if self.tw_counter <= self.n_trials - 2:
+                    next_trigger_event = self.trigger_events[self.tw_counter + 1]
+                else:
+                    next_trigger_event = np.inf * pq.s
     
             # # case 1: pre/post trial analysis,
             # i.e. waiting for IDW  with new trigger event

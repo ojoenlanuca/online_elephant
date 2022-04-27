@@ -312,22 +312,29 @@ def _visualize_results_of_offline_and_online_uea(
 
 
 def _simulate_buffered_reading(n_buffers, ouea, st1, st2, IDW_length,
-                               length_remainder):
+                               length_remainder, events=None):
+    if events is None:
+        events = np.array([])
     for i in range(n_buffers):
+        buff_t_start = i * IDW_length
+
         if length_remainder > 1e-7 and i == n_buffers - 1:
-            ouea.update_uea(
-                spiketrains=[
-                    st1.time_slice(t_start=i * IDW_length,
-                                   t_stop=i * IDW_length + length_remainder),
-                    st2.time_slice(t_start=i * IDW_length,
-                                   t_stop=i * IDW_length + length_remainder)])
+            buff_t_stop = i * IDW_length + length_remainder
         else:
-            ouea.update_uea(
-                spiketrains=[
-                    st1.time_slice(t_start=i * IDW_length,
-                                    t_stop=i * IDW_length + IDW_length),
-                    st2.time_slice(t_start=i * IDW_length,
-                                   t_stop=i * IDW_length + IDW_length)])
+            buff_t_stop = i * IDW_length + IDW_length
+
+        events_in_buffer = np.array([])
+        if len(events) > 0:
+            idx_events_in_buffer = (events >= buff_t_start) & \
+                                   (events <= buff_t_stop)
+            events_in_buffer = events[idx_events_in_buffer].tolist()
+            events = events[np.logical_not(idx_events_in_buffer)]
+
+        ouea.update_uea(
+            spiketrains=[
+                st1.time_slice(t_start=buff_t_start, t_stop=buff_t_stop),
+                st2.time_slice(t_start=buff_t_start, t_stop=buff_t_stop)],
+            events=events_in_buffer)
         print(f"#buffer = {i}")  # DEBUG-aid
         # # aid to create timelapses
         # result_dict = ouea.get_results()
@@ -429,7 +436,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                     actual=ue_dict_online["input_parameters"][key],
                     desired=ue_dict_offline["input_parameters"][key])
 
-    def _test_unitary_events_analysis_with_real_data(self, idw_length):
+    def _test_unitary_events_analysis_with_real_data(
+            self, idw_length, method="pass_events_at_initialization"):
         # Fix random seed to guarantee fixed output
         random.seed(1224)
 
@@ -439,7 +447,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # DEBUG-info: IDW_length = 0.8s, 0.1s, 0.05s successfully pass test
         IDW_length = idw_length  # sec
         noise_length = 0. * pq.s
-        TS_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
+        trigger_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
         n_buffers, length_remainder = _calculate_n_buffers(
             n_trials=n_trials, tw_length=TW_length,
             noise_length=noise_length, idw_length=IDW_length)
@@ -454,19 +462,29 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
             winstep=5 * pq.ms, pattern_hash=[3])
 
+        if method == "pass_events_at_initialization":
+            init_events = trigger_events
+            reading_events = np.array([])
+        elif method == "pass_events_while_buffered_reading":
+            init_events = np.array([])
+            reading_events = trigger_events
+        else:
+            raise ValueError("Illeagal method to pass events!")
+
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005 * pq.s, trigger_pre_size=0. * pq.s,
             trigger_post_size=2.1 * pq.s, idw_size=IDW_length,
             saw_size=0.1 * pq.s, saw_step=0.005 * pq.s,
-            mw_size=2.5 * IDW_length, trigger_event=TS_events)
+            mw_size=2.5 * IDW_length, trigger_events=init_events)
         # perform online unitary events analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
         _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=neo_st1,
                                    st2=neo_st2, IDW_length=IDW_length,
-                                   length_remainder=length_remainder)
+                                   length_remainder=length_remainder,
+                                   events=reading_events)
         ue_dict_online = ouea.get_results()
 
         # assert equality between result dicts of standard and online ue version
@@ -480,7 +498,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
         #     ue_dict_online=ue_dict_online, alpha=0.05)
 
-    def _test_unitary_events_analysis_with_artificial_data(self, idw_length):
+    def _test_unitary_events_analysis_with_artificial_data(
+            self, idw_length, method="pass_events_at_initialization"):
         # Fix random seed to guarantee fixed output
         random.seed(1224)
 
@@ -508,19 +527,29 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
                                          win_size=100*pq.ms, win_step=5*pq.ms)
 
+        if method == "pass_events_at_initialization":
+            init_events = trigger_events
+            reading_events = np.array([])
+        elif method == "pass_events_while_buffered_reading":
+            init_events = np.array([])
+            reading_events = trigger_events
+        else:
+            raise ValueError("Illeagal method to pass events!")
+
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005*pq.s, trigger_pre_size=trigger_pre_size,
             trigger_post_size=trigger_post_size, idw_size=IDW_length,
             saw_size=0.1*pq.s, saw_step=0.005*pq.s,
-            mw_size=2.5*IDW_length, trigger_event=trigger_events)
+            mw_size=2.5*IDW_length, trigger_events=init_events)
         # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
         _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=st1_long,
                                    st2=st2_long, IDW_length=IDW_length,
-                                   length_remainder=length_remainder)
+                                   length_remainder=length_remainder,
+                                   events=reading_events)
         ue_dict_online = ouea.get_results()
 
         # assert equality between result dicts of standard and online ue version
@@ -594,6 +623,22 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                 self._test_unitary_events_analysis_with_real_data(
                     idw_length=idw)
                 self.doCleanups()
+
+    def test_pass_trigger_events_while_buffered_reading_real_data(self):
+        idw_length = 2.1 * pq.s
+        with self.subTest(f"IDW = {idw_length}"):
+            self._test_unitary_events_analysis_with_real_data(
+                idw_length=idw_length,
+                method="pass_events_while_buffered_reading")
+            self.doCleanups()
+
+    def test_pass_trigger_events_while_buffered_reading_artificial_data(self):
+        idw_length = 1 * pq.s
+        with self.subTest(f"IDW = {idw_length}"):
+            self._test_unitary_events_analysis_with_artificial_data(
+                idw_length=idw_length,
+                method="pass_events_while_buffered_reading")
+            self.doCleanups()
 
 
 if __name__ == '__main__':
