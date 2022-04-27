@@ -260,9 +260,10 @@ class OnlineUnitaryEventAnalysis:
         # TODO: too small overlap leads to too fast moving of mv,
         #  i.e. spikes of current trial are discarded
         for i in range(self.n_neurons):
-            idx = np.where(new_t_start <= self.mw[i])[0]
+            idx = np.where(new_t_start > self.mw[i])[0]
+            # print(f"idx = {idx}")
             if not len(idx) == 0:  # move mv
-                self.mw[i] = self.mw[i][idx[0]:idx[-1]+1]
+                self.mw[i] = self.mw[i][idx[-1]+1:]
             else:  # keep mv
                 self.data_available_in_mv = False
                 pass
