@@ -1,5 +1,6 @@
 import random
 import unittest
+from collections import defaultdict
 from time import perf_counter_ns
 
 import matplotlib.pyplot as plt
@@ -444,7 +445,6 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # set relevant variables of this TestCase
         n_trials = 36  # determined by real data
         TW_length = 2.1 * pq.s  # sec       # determined by real data
-        # DEBUG-info: IDW_length = 0.8s, 0.1s, 0.05s successfully pass test
         IDW_length = idw_length  # sec
         noise_length = 0. * pq.s
         trigger_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
@@ -496,6 +496,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # _visualize_results_of_offline_and_online_uea(
         #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
         #     ue_dict_online=ue_dict_online, alpha=0.05)
+
+        return ouea
 
     def _test_unitary_events_analysis_with_artificial_data(
             self, idw_length, method="pass_events_at_initialization"):
@@ -560,6 +562,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # _visualize_results_of_offline_and_online_uea(
         #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
         #     ue_dict_online=ue_dict_online, alpha=0.01)
+
+        return ouea
 
     # test: trial window > in-coming data window    (TW > IDW)
     def test_TW_larger_IDW_artificial_data(self):
@@ -637,6 +641,88 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                 idw_length=idw_length,
                 method="pass_events_while_buffered_reading")
             self.doCleanups()
+
+    def test_reset(self):
+        idw_length = 2.1 * pq.s
+        with self.subTest(f"IDW = {idw_length}"):
+            ouea = self._test_unitary_events_analysis_with_real_data(
+                idw_length=idw_length)
+            self.doCleanups()
+        # do reset with default parameters
+        ouea.reset()
+        # check all class attributes
+        with self.subTest(f"check 'time_unit'"):
+            self.assertEqual(ouea.time_unit, 1 * pq.s)
+        with self.subTest(f"check 'data_available_in_mv'"):
+            self.assertEqual(ouea.data_available_in_mv, None)
+        with self.subTest(f"check 'waiting_for_new_trigger'"):
+            self.assertEqual(ouea.waiting_for_new_trigger, True)
+        with self.subTest(f"check 'trigger_events_left_over'"):
+            self.assertEqual(ouea.trigger_events_left_over, True)
+        with self.subTest(f"check 'bw_size'"):
+            self.assertEqual(ouea.bw_size, 0.005 * pq.s)
+        with self.subTest(f"check 'trigger_events'"):
+            self.assertEqual(ouea.trigger_events, [])
+        with self.subTest(f"check 'trigger_pre_size'"):
+            self.assertEqual(ouea.trigger_pre_size, 0.5 * pq.s)
+        with self.subTest(f"check 'trigger_post_size'"):
+            self.assertEqual(ouea.trigger_post_size, 0.5 * pq.s)
+        with self.subTest(f"check 'saw_size'"):
+            self.assertEqual(ouea.saw_size, 0.1 * pq.s)
+        with self.subTest(f"check 'saw_step'"):
+            self.assertEqual(ouea.saw_step, 0.005 * pq.s)
+        with self.subTest(f"check 'n_neurons'"):
+            self.assertEqual(ouea.n_neurons, 2)
+        with self.subTest(f"check 'pattern_hash'"):
+            self.assertEqual(ouea.pattern_hash, [3])
+        with self.subTest(f"check 'mw'"):
+            np.testing.assert_equal(ouea.mw, [[] for _ in range(2)])
+        with self.subTest(f"check 'tw_size'"):
+            self.assertEqual(ouea.tw_size, 1 * pq.s)
+        with self.subTest(f"check 'tw'"):
+            np.testing.assert_equal(ouea.tw, [[] for _ in range(2)])
+        with self.subTest(f"check 'tw_counter'"):
+            self.assertEqual(ouea.tw_counter, 0)
+        with self.subTest(f"check 'n_bins'"):
+            self.assertEqual(ouea.n_bins, None)
+        with self.subTest(f"check 'bw'"):
+            self.assertEqual(ouea.bw, None)
+        with self.subTest(f"check 'saw_pos_counter'"):
+            self.assertEqual(ouea.saw_pos_counter, 0)
+        with self.subTest(f"check 'n_windows'"):
+            self.assertEqual(ouea.n_windows, 181)
+        with self.subTest(f"check 'n_trials'"):
+            self.assertEqual(ouea.n_trials, 0)
+        with self.subTest(f"check 'n_hashes'"):
+            self.assertEqual(ouea.n_hashes, 1)
+        with self.subTest(f"check 'method'"):
+            self.assertEqual(ouea.method, 'analytic_TrialByTrial')
+        with self.subTest(f"check 'n_surrogates'"):
+            self.assertEqual(ouea.n_surrogates, 100)
+        with self.subTest(f"check 'input_parameters'"):
+            self.assertEqual(ouea.input_parameters["pattern_hash"], [3])
+            self.assertEqual(ouea.input_parameters["bin_size"], 5 * pq.ms)
+            self.assertEqual(ouea.input_parameters["win_size"], 100 * pq.ms)
+            self.assertEqual(ouea.input_parameters["win_step"], 5 * pq.ms)
+            self.assertEqual(ouea.input_parameters["method"],
+                             'analytic_TrialByTrial')
+            self.assertEqual(ouea.input_parameters["t_start"], 0 * pq.s)
+            self.assertEqual(ouea.input_parameters["t_stop"], 1 * pq.s)
+            self.assertEqual(ouea.input_parameters["n_surrogates"], 100)
+        with self.subTest(f"check 'Js'"):
+            np.testing.assert_equal(ouea.Js, np.zeros((181, 1),
+                                                      dtype=np.float64))
+        with self.subTest(f"check 'n_exp'"):
+            np.testing.assert_equal(ouea.n_exp, np.zeros((181, 1),
+                                                         dtype=np.float64))
+        with self.subTest(f"check 'n_emp'"):
+            np.testing.assert_equal(ouea.n_emp, np.zeros((181, 1),
+                                                         dtype=np.float64))
+        with self.subTest(f"check 'rate_avg'"):
+            np.testing.assert_equal(ouea.rate_avg, np.zeros((181, 1, 2),
+                                                     dtype=np.float64))
+        with self.subTest(f"check 'indices'"):
+            np.testing.assert_equal(ouea.indices, defaultdict(list))
 
 
 if __name__ == '__main__':

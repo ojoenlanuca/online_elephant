@@ -11,8 +11,6 @@ from elephant.statistics import mean_firing_rate, isi
 from elephant.unitary_event_analysis import *
 from elephant.unitary_event_analysis import _winpos, _bintime, _UE
 
-from utils import round_to_nearest_fraction_multiple
-
 
 class OnlineMeanFiringRate:
     def __init__(self, buffer_size=1):
@@ -308,9 +306,13 @@ class OnlineUnitaryEventAnalysis:
         * 'n_exp'
         * 'rate_avg'
         * 'input_parameters'
-    update_uea(spiketrains, events=None)
+    update_uea(spiketrains, events)
         Updates the entries of the result dictionary by processing the
         new arriving 'spiketrains' and trial defining trigger 'events'.
+    reset(bw_size, trigger_events, trigger_pre_size, trigger_post_size,
+            saw_size, saw_step, n_neurons, pattern_hash)
+        Resets all class attributes to their initial (default) value. It is
+        actually a re-initialization which allows parameter adjustments.
 
     Returns
     -------
@@ -376,7 +378,7 @@ class OnlineUnitaryEventAnalysis:
             (self.tw_size - self.saw_size + self.saw_step) / self.saw_step))
 
         # determine the number trials and the number of patterns (hashes)
-        self.n_trials = len(trigger_events)
+        self.n_trials = len(self.trigger_events)
         self.n_hashes = len(self.pattern_hash)
 
         # save input parameters as dict like the offline version of UEA it does
@@ -829,3 +831,24 @@ class OnlineUnitaryEventAnalysis:
                     self._move_saw_over_tw(t_stop_idw=idw_t_stop)
                 else:
                     pass
+
+    def reset(self, bw_size=0.005 * pq.s, trigger_events=None,
+              trigger_pre_size=0.5 * pq.s, trigger_post_size=0.5 * pq.s,
+              saw_size=0.1 * pq.s, saw_step=0.005*pq.s, n_neurons=2,
+              pattern_hash=None):
+        """
+        Resets all class attributes to their initial value.
+
+        This reset is actually a re-initialization which allows parameter
+        adjustments, so that one instance of 'OnlineUnitaryEventAnalysis' can
+        be flexibly adjusted to changing experimental circumstances.
+
+        Parameters
+        ----------
+        (same as for the constructor; see docstring of constructor for details)
+
+        """
+        self.__init__(bw_size, trigger_events, trigger_pre_size,
+                      trigger_post_size, saw_size, saw_step, n_neurons,
+                      pattern_hash)
+
