@@ -610,8 +610,6 @@ class OnlineUnitaryEventAnalysis:
         self.t_winpos = _winpos(t_start, t_stop, win_size, win_step,
                                 position='left-edge')
         while len(self.t_winpos) != self.n_windows:
-            # print(f"n_winpos = {self.n_windows} | "             # DEBUG-aid
-            #       f"len(t_winpos) = {len(self.t_winpos)}")      # DEBUG-aid
             if len(self.t_winpos) > self.n_windows:
                 self.t_winpos = _winpos(t_start, t_stop - win_step/2, win_size,
                                         win_step, position='left-edge')
@@ -662,12 +660,10 @@ class OnlineUnitaryEventAnalysis:
         for i in range(self.saw_pos_counter, self.n_windows):
             p_realtime = self.t_winpos[i]
             p_bintime = self.t_winpos_bintime[i] - self.t_winpos_bintime[0]
-            # check if saw filled with data? yes: -> a) & b);  no: -> pause
+            # check if saw filled with data
             # TODO: maybe check for lower boundery is also needed
             if p_realtime + self.saw_size <= t_stop_idw:  # saw is filled
                 mat_win = np.zeros((1, self.n_neurons, self.winsize_bintime))
-                # if i == 0:                                # DEBUG-aid
-                #     print(f"debug_entry = {i}")           # DEBUG-aid
                 n_bins_in_current_saw = self.bw[
                     :, p_bintime:p_bintime + self.winsize_bintime].shape[1]
                 if n_bins_in_current_saw < self.winsize_bintime:
@@ -681,10 +677,6 @@ class OnlineUnitaryEventAnalysis:
                 Js_win, rate_avg, n_exp_win, n_emp_win, indices_lst = _UE(
                     mat_win, pattern_hash=self.pattern_hash,
                     method=self.method, n_surrogates=self.n_surrogates)
-                # if i == 0:                                # DEBUG-aid
-                #     print(f"trial = {self.tw_counter}     # DEBUG-aid
-                #     sum = {rate_avg * (self.saw_size/     # DEBUG-aid
-                #     self.bw_size )}")                     # DEBUG-aid
                 self.rate_avg[i] += rate_avg
                 self.n_exp[i] += (np.round(
                     n_exp_win * (self.saw_size / self.bw_size))).astype(int)
