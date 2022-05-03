@@ -565,8 +565,7 @@ class OnlineUnitaryEventAnalysis:
         else:
             return False
 
-    def _apply_bw_to_tw(self, spiketrains, bin_size, t_start, t_stop,
-                        n_neurons):
+    def _apply_bw_to_tw(self):
         """
         Apply bin window (BW) to trial window (TW).
         
@@ -578,13 +577,16 @@ class OnlineUnitaryEventAnalysis:
         # Todo: remove the parameters and access directly the used
         #  class attributes.
 
-        self.n_bins = int(((t_stop - t_start) / bin_size).simplified.item())
-        self.bw = np.zeros((1, n_neurons, self.n_bins), dtype=np.int32)
+        self.n_bins = int(((self.trial_stop - self.trial_start) /
+                           self.bw_size).simplified.item())
+        self.bw = np.zeros((1, self.n_neurons, self.n_bins), dtype=np.int32)
         spiketrains = [neo.SpikeTrain(np.array(st)*self.time_unit,
-                                      t_start=t_start, t_stop=t_stop)
-                       for st in spiketrains]
-        bs = conv.BinnedSpikeTrain(spiketrains, t_start=t_start,
-                                   t_stop=t_stop, bin_size=bin_size)
+                                      t_start=self.trial_start,
+                                      t_stop=self.trial_stop)
+                       for st in self.tw]
+        bs = conv.BinnedSpikeTrain(spiketrains, t_start=self.trial_start,
+                                   t_stop=self.trial_stop,
+                                   bin_size=self.bw_size)
         self.bw = bs.to_bool_array()
 
     def _set_saw_positions(self, t_start, t_stop, win_size, win_step, bin_size):
@@ -787,10 +789,7 @@ class OnlineUnitaryEventAnalysis:
                         # define TW around trigger event
                         self._define_tw(trigger_event=current_trigger_event)
                         # apply BW to available data in TW
-                        self._apply_bw_to_tw(
-                            spiketrains=self.tw, bin_size=self.bw_size,
-                            t_start=self.trial_start, t_stop=self.trial_stop,
-                            n_neurons=self.n_neurons)
+                        self._apply_bw_to_tw()
                         # move SAW over available data in TW
                         self._move_saw_over_tw(t_stop_idw=idw_t_stop)
                     else:
@@ -823,10 +822,7 @@ class OnlineUnitaryEventAnalysis:
                     # define trial TW around trigger event
                     self._define_tw(trigger_event=current_trigger_event)
                     # apply BW to available data in TW
-                    self._apply_bw_to_tw(
-                        spiketrains=self.tw, bin_size=self.bw_size,
-                        t_start=self.trial_start, t_stop=self.trial_stop,
-                        n_neurons=self.n_neurons)
+                    self._apply_bw_to_tw()
                     # move SAW over available data in TW
                     self._move_saw_over_tw(t_stop_idw=idw_t_stop)
                 else:
