@@ -475,9 +475,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005 * pq.s, trigger_pre_size=0. * pq.s,
-            trigger_post_size=2.1 * pq.s, idw_size=IDW_length,
-            saw_size=0.1 * pq.s, saw_step=0.005 * pq.s,
-            mw_size=2.5 * IDW_length, trigger_events=init_events)
+            trigger_post_size=2.1 * pq.s, saw_size=0.1 * pq.s,
+            saw_step=0.005 * pq.s, trigger_events=init_events)
         # perform online unitary events analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
@@ -540,9 +539,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=0.005*pq.s, trigger_pre_size=trigger_pre_size,
-            trigger_post_size=trigger_post_size, idw_size=IDW_length,
-            saw_size=0.1*pq.s, saw_step=0.005*pq.s,
-            mw_size=2.5*IDW_length, trigger_events=init_events)
+            trigger_post_size=trigger_post_size, saw_size=0.1 * pq.s,
+            saw_step=0.005 * pq.s, trigger_events=init_events)
         # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
