@@ -532,7 +532,6 @@ class OnlineUnitaryEventAnalysis:
         self.trial_start = trigger_event - self.trigger_pre_size
         self.trial_stop = trigger_event + self.trigger_post_size
         for i in range(self.n_neurons):
-            # TODO: use a slicing view of mw instead of creating a new list
             self.tw[i] = [t for t in self.mw[i]
                           if (self.trial_start <= t) & (t <= self.trial_stop)]
 
@@ -574,9 +573,6 @@ class OnlineUnitaryEventAnalysis:
         if no spike is within a bin, it is empty.
 
         """
-        # Todo: remove the parameters and access directly the used
-        #  class attributes.
-
         self.n_bins = int(((self.trial_stop - self.trial_start) /
                            self.bw_size).simplified.item())
         self.bw = np.zeros((1, self.n_neurons, self.n_bins), dtype=np.int32)
@@ -661,7 +657,6 @@ class OnlineUnitaryEventAnalysis:
             p_realtime = self.t_winpos[i]
             p_bintime = self.t_winpos_bintime[i] - self.t_winpos_bintime[0]
             # check if saw filled with data
-            # TODO: maybe check for lower boundery is also needed
             if p_realtime + self.saw_size <= t_stop_idw:  # saw is filled
                 mat_win = np.zeros((1, self.n_neurons, self.winsize_bintime))
                 n_bins_in_current_saw = self.bw[
@@ -839,4 +834,3 @@ class OnlineUnitaryEventAnalysis:
         self.__init__(bw_size, trigger_events, trigger_pre_size,
                       trigger_post_size, saw_size, saw_step, n_neurons,
                       pattern_hash)
-
