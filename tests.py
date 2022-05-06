@@ -265,26 +265,29 @@ class TestOnlinePearsonCorrelationCoefficient(unittest.TestCase):
                                    rtol=self.rtol, atol=self.atol)
 
 
-def _generate_spiketrains(freq, length, trigger_events, injection_pos, trigger_pre_size,
-                          trigger_post_size):
+def _generate_spiketrains(freq, length, trigger_events, injection_pos,
+                          trigger_pre_size, trigger_post_size,
+                          time_unit=1*pq.s):
     """
     Generate two spiketrains from an homogeneous Poisson process with
     injected coincideces.
     """
-    st1 = homogeneous_poisson_process(
-        rate=freq, t_start=0*pq.s, t_stop=length)
-    st2 = homogeneous_poisson_process(
-        rate=freq, t_start=0*pq.s, t_stop=length)
+    st1 = homogeneous_poisson_process(rate=freq,
+                                      t_start=(0*pq.s).rescale(time_unit),
+                                      t_stop=length.rescale(time_unit))
+    st2 = homogeneous_poisson_process(rate=freq,
+                                      t_start=(0*pq.s.rescale(time_unit)),
+                                      t_stop=length.rescale(time_unit))
     # inject 10 coincidences within a 0.1s interval for each trial
-    injection = np.linspace(0, 0.1, 10)*pq.s
+    injection = (np.linspace(0, 0.1, 10)*pq.s).rescale(time_unit)
     all_injections = np.array([])
     for i in trigger_events:
         all_injections = np.concatenate(
-            (all_injections, (i+injection_pos)+injection), axis=0) * pq.s
+            (all_injections, (i+injection_pos)+injection), axis=0) * time_unit
     st1 = st1.duplicate_with_new_data(
-        np.sort(np.concatenate((st1.times, all_injections)))*pq.s)
+        np.sort(np.concatenate((st1.times, all_injections)))*time_unit)
     st2 = st2.duplicate_with_new_data(
-        np.sort(np.concatenate((st2.times, all_injections)))*pq.s)
+        np.sort(np.concatenate((st2.times, all_injections)))*time_unit)
 
     # stack spiketrains by trial
     st1_stacked = [st1.time_slice(
@@ -345,7 +348,7 @@ def _simulate_buffered_reading(n_buffers, ouea, st1, st2, IDW_length,
         # plt.savefig(f"plots/timelapse_UE/ue_real_data_buff_{i}.pdf")
 
 
-def _load_real_data(n_trials, trial_length):
+def _load_real_data(n_trials, trial_length, time_unit):
     # load data and extract spiketrains
     io = neo.io.NixIO("data/dataset-1.nix", 'ro')
     block = io.read_block()
@@ -369,9 +372,9 @@ def _load_real_data(n_trials, trial_length):
         st1_concat = np.concatenate((st1_concat, st1_long[i]))
         st2_concat = np.concatenate((st2_concat, st2_long[i]))
     neo_st1 = neo.SpikeTrain((st1_concat / 1000) * pq.s, t_start=0 * pq.s,
-                             t_stop=n_trials * trial_length)
+                             t_stop=n_trials * trial_length).rescale(time_unit)
     neo_st2 = neo.SpikeTrain((st2_concat / 1000) * pq.s, t_start=0 * pq.s,
-                             t_stop=n_trials * trial_length)
+                             t_stop=n_trials * trial_length).rescale(time_unit)
     return spiketrains, neo_st1, neo_st2
 
 
@@ -379,7 +382,8 @@ def _calculate_n_buffers(n_trials, tw_length, noise_length, idw_length):
     _n_buffers_float = n_trials * (tw_length + noise_length) / idw_length
     _n_buffers_int = int(_n_buffers_float)
     _n_buffers_fraction = _n_buffers_float - _n_buffers_int
-    n_buffers = _n_buffers_int + 1 if _n_buffers_fraction > 1e-7 else _n_buffers_int
+    n_buffers = _n_buffers_int + 1 if _n_buffers_fraction > 1e-7 else \
+        _n_buffers_int
     length_remainder = idw_length * _n_buffers_fraction
     return n_buffers, length_remainder
 
@@ -388,6 +392,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(73)
+        cls.time_unit = 1 * pq.s
 
     def setUp(self):
         pass
@@ -438,16 +443,18 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                     desired=ue_dict_offline["input_parameters"][key])
 
     def _test_unitary_events_analysis_with_real_data(
-            self, idw_length, method="pass_events_at_initialization"):
+            self, idw_length, method="pass_events_at_initialization",
+            time_unit=1 * pq.s):
         # Fix random seed to guarantee fixed output
         random.seed(1224)
 
         # set relevant variables of this TestCase
         n_trials = 36  # determined by real data
-        TW_length = 2.1 * pq.s  # sec       # determined by real data
-        IDW_length = idw_length  # sec
-        noise_length = 0. * pq.s
-        trigger_events = np.arange(0., n_trials * 2.1, 2.1) * pq.s
+        TW_length = (2.1 * pq.s).rescale(time_unit)  # determined by real data
+        IDW_length = idw_length.rescale(time_unit)
+        noise_length = (0. * pq.s).rescale(time_unit)
+        trigger_events = (np.arange(0., n_trials * 2.1, 2.1) * pq.s).rescale(
+            time_unit)
         n_buffers, length_remainder = _calculate_n_buffers(
             n_trials=n_trials, tw_length=TW_length,
             noise_length=noise_length, idw_length=IDW_length)
@@ -455,18 +462,20 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # load data and extract spiketrains
         # 36 trials with 2.1s length and 0s background noise in between trials
         spiketrains, neo_st1, neo_st2 = _load_real_data(n_trials=n_trials,
-                                                        trial_length=TW_length)
+                                                        trial_length=TW_length,
+                                                        time_unit=time_unit)
 
         # perform standard unitary events analysis
         ue_dict = jointJ_window_analysis(
-            spiketrains, bin_size=5 * pq.ms, winsize=100 * pq.ms,
-            winstep=5 * pq.ms, pattern_hash=[3])
+            spiketrains, bin_size=(0.005 * pq.s).rescale(time_unit),
+            winsize=(0.1 * pq.s).rescale(time_unit),
+            winstep=(0.005 * pq.s).rescale(time_unit), pattern_hash=[3])
 
         if method == "pass_events_at_initialization":
             init_events = trigger_events
-            reading_events = np.array([])
+            reading_events = np.array([]) * time_unit
         elif method == "pass_events_while_buffered_reading":
-            init_events = np.array([])
+            init_events = np.array([]) * time_unit
             reading_events = trigger_events
         else:
             raise ValueError("Illeagal method to pass events!")
@@ -474,9 +483,13 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
-            bw_size=0.005 * pq.s, trigger_pre_size=0. * pq.s,
-            trigger_post_size=2.1 * pq.s, saw_size=0.1 * pq.s,
-            saw_step=0.005 * pq.s, trigger_events=init_events)
+            bw_size=(0.005 * pq.s).rescale(time_unit),
+            trigger_pre_size=(0. * pq.s).rescale(time_unit),
+            trigger_post_size=(2.1 * pq.s).rescale(time_unit),
+            saw_size=(0.1 * pq.s).rescale(time_unit),
+            saw_step=(0.005 * pq.s).rescale(time_unit),
+            trigger_events=init_events,
+            time_unit=time_unit)
         # perform online unitary events analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
@@ -500,18 +513,20 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         return ouea
 
     def _test_unitary_events_analysis_with_artificial_data(
-            self, idw_length, method="pass_events_at_initialization"):
+            self, idw_length, method="pass_events_at_initialization",
+            time_unit=1 * pq.s):
         # Fix random seed to guarantee fixed output
         random.seed(1224)
 
         # set relevant variables of this TestCase
         n_trials = 40
-        TW_length = 1 * pq.s  # sec
-        noise_length = 1.5 * pq.s
-        IDW_length = idw_length  # sec
-        trigger_events = np.arange(0., n_trials*2.5, 2.5)*pq.s
-        trigger_pre_size = 0. * pq.s
-        trigger_post_size = 1. * pq.s
+        TW_length = (1 * pq.s).rescale(time_unit)
+        noise_length = (1.5 * pq.s).rescale(time_unit)
+        IDW_length = idw_length.rescale(time_unit)
+        trigger_events = (np.arange(0., n_trials*2.5, 2.5) * pq.s).rescale(
+            time_unit)
+        trigger_pre_size = (0. * pq.s).rescale(time_unit)
+        trigger_post_size = (1. * pq.s).rescale(time_unit)
         n_buffers, length_remainder = _calculate_n_buffers(
             n_trials=n_trials, tw_length=TW_length,
             noise_length=noise_length, idw_length=IDW_length)
@@ -520,29 +535,36 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         # 40 trials with 1s length and 1.5s background noise in between trials
         spiketrains, st1_long, st2_long = _generate_spiketrains(
             freq=5*pq.Hz, length=(TW_length+noise_length)*n_trials,
-            trigger_events=trigger_events, injection_pos=0.6 * pq.s,
+            trigger_events=trigger_events,
+            injection_pos=(0.6 * pq.s).rescale(time_unit),
             trigger_pre_size=trigger_pre_size,
-            trigger_post_size=trigger_post_size)
+            trigger_post_size=trigger_post_size,
+            time_unit=time_unit)
 
         # perform standard unitary event analysis
-        ue_dict = jointJ_window_analysis(spiketrains, bin_size=5*pq.ms,
-                                         win_size=100*pq.ms, win_step=5*pq.ms)
+        ue_dict = jointJ_window_analysis(
+            spiketrains, bin_size=(0.005 * pq.s).rescale(time_unit),
+            win_size=(0.1 * pq.s).rescale(time_unit),
+            win_step=(0.005 * pq.s).rescale(time_unit), pattern_hash=[3])
 
         if method == "pass_events_at_initialization":
             init_events = trigger_events
-            reading_events = np.array([])
+            reading_events = np.array([]) * time_unit
         elif method == "pass_events_while_buffered_reading":
-            init_events = np.array([])
+            init_events = np.array([]) * time_unit
             reading_events = trigger_events
         else:
             raise ValueError("Illeagal method to pass events!")
 
         # create instance of OnlineUnitaryEventAnalysis
-        # TODO: use one pyhsical unit as standard and rescale others accordingly
         ouea = OnlineUnitaryEventAnalysis(
-            bw_size=0.005*pq.s, trigger_pre_size=trigger_pre_size,
-            trigger_post_size=trigger_post_size, saw_size=0.1 * pq.s,
-            saw_step=0.005 * pq.s, trigger_events=init_events)
+            bw_size=(0.005 * pq.s).rescale(time_unit),
+            trigger_pre_size=trigger_pre_size,
+            trigger_post_size=trigger_post_size,
+            saw_size=(0.1 * pq.s).rescale(time_unit),
+            saw_step=(0.005 * pq.s).rescale(time_unit),
+            trigger_events=init_events,
+            time_unit=time_unit)
         # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
@@ -569,90 +591,94 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     def test_TW_larger_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
         larger than the in-coming data window with artificial data."""
-        idw_length = [0.995, 0.8, 0.6, 0.3, 0.1, 0.05] * pq.s
+        idw_length = ([0.995, 0.8, 0.6, 0.3, 0.1, 0.05]*pq.s).rescale(
+            self.time_unit)
         for idw in idw_length:
             with self.subTest(f"IDW = {idw}"):
                 self._test_unitary_events_analysis_with_artificial_data(
-                    idw_length=idw)
+                    idw_length=idw, time_unit=self.time_unit)
                 self.doCleanups()
 
     def test_TW_larger_IDW_real_data(self):
         """Test, if online UE analysis is correct when the trial window is
                 larger than the in-coming data window with real data."""
-        idw_length = [2.05, 2., 1.1, 0.8, 0.1, 0.05] * pq.s
+        idw_length = ([2.05, 2., 1.1, 0.8, 0.1, 0.05]*pq.s).rescale(
+            self.time_unit)
         for idw in idw_length:
             with self.subTest(f"IDW = {idw}"):
                 self._test_unitary_events_analysis_with_real_data(
-                    idw_length=idw)
+                    idw_length=idw, time_unit=self.time_unit)
                 self.doCleanups()
 
     # test: trial window = in-coming data window    (TW = IDW)
     def test_TW_as_large_as_IDW_real_data(self):
         """Test, if online UE analysis is correct when the trial window is
                 as large as the in-coming data window with real data."""
-        idw_length = 2.1 * pq.s
+        idw_length = (2.1*pq.s).rescale(self.time_unit)
         with self.subTest(f"IDW = {idw_length}"):
             self._test_unitary_events_analysis_with_real_data(
-                idw_length=idw_length)
+                idw_length=idw_length, time_unit=self.time_unit)
             self.doCleanups()
 
     def test_TW_as_large_as_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
                 as large as the in-coming data window with artificial data."""
-        idw_length = 1 * pq.s
+        idw_length = (1*pq.s).rescale(self.time_unit)
         with self.subTest(f"IDW = {idw_length}"):
             self._test_unitary_events_analysis_with_artificial_data(
-                idw_length=idw_length)
+                idw_length=idw_length, time_unit=self.time_unit)
             self.doCleanups()
 
     # test: trial window < in-coming data window    (TW < IDW)
     def test_TW_smaller_IDW_artificial_data(self):
         """Test, if online UE analysis is correct when the trial window is
         smaller than the in-coming data window with artificial data."""
-        idw_length = [1.05, 1.1, 2, 10, 50, 100] * pq.s
+        idw_length = ([1.05, 1.1, 2, 10, 50, 100]*pq.s).rescale(self.time_unit)
         for idw in idw_length:
             with self.subTest(f"IDW = {idw}"):
                 self._test_unitary_events_analysis_with_artificial_data(
-                    idw_length=idw)
+                    idw_length=idw, time_unit=self.time_unit)
                 self.doCleanups()
 
     def test_TW_smaller_IDW_real_data(self):
         """Test, if online UE analysis is correct when the trial window is
                 smaller than the in-coming data window with real data."""
-        idw_length = [2.15, 2.2, 3, 10, 50, 75.6] * pq.s
+        idw_length = ([2.15, 2.2, 3, 10, 50, 75.6]*pq.s).rescale(self.time_unit)
         for idw in idw_length:
             with self.subTest(f"IDW = {idw}"):
                 self._test_unitary_events_analysis_with_real_data(
-                    idw_length=idw)
+                    idw_length=idw, time_unit=self.time_unit)
                 self.doCleanups()
 
     def test_pass_trigger_events_while_buffered_reading_real_data(self):
-        idw_length = 2.1 * pq.s
+        idw_length = (2.1*pq.s).rescale(self.time_unit)
         with self.subTest(f"IDW = {idw_length}"):
             self._test_unitary_events_analysis_with_real_data(
                 idw_length=idw_length,
-                method="pass_events_while_buffered_reading")
+                method="pass_events_while_buffered_reading",
+                time_unit=self.time_unit)
             self.doCleanups()
 
     def test_pass_trigger_events_while_buffered_reading_artificial_data(self):
-        idw_length = 1 * pq.s
+        idw_length = (1*pq.s).rescale(self.time_unit)
         with self.subTest(f"IDW = {idw_length}"):
             self._test_unitary_events_analysis_with_artificial_data(
                 idw_length=idw_length,
-                method="pass_events_while_buffered_reading")
+                method="pass_events_while_buffered_reading",
+                time_unit=self.time_unit)
             self.doCleanups()
 
     def test_reset(self):
-        idw_length = 2.1 * pq.s
+        idw_length = (2.1*pq.s).rescale(self.time_unit)
         with self.subTest(f"IDW = {idw_length}"):
             ouea = self._test_unitary_events_analysis_with_real_data(
-                idw_length=idw_length)
+                idw_length=idw_length, time_unit=self.time_unit)
             self.doCleanups()
         # do reset with default parameters
         ouea.reset()
         # check all class attributes
         with self.subTest(f"check 'time_unit'"):
-            self.assertEqual(ouea.time_unit, 1 * pq.s)
+            self.assertEqual(ouea.time_unit, 1*pq.s)
         with self.subTest(f"check 'data_available_in_mv'"):
             self.assertEqual(ouea.data_available_in_mv, None)
         with self.subTest(f"check 'waiting_for_new_trigger'"):
@@ -720,7 +746,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
                                                          dtype=np.float64))
         with self.subTest(f"check 'rate_avg'"):
             np.testing.assert_equal(ouea.rate_avg, np.zeros((181, 1, 2),
-                                                     dtype=np.float64))
+                                                            dtype=np.float64))
         with self.subTest(f"check 'indices'"):
             np.testing.assert_equal(ouea.indices, defaultdict(list))
 

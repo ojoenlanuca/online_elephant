@@ -200,12 +200,12 @@ class OnlineUnitaryEventAnalysis:
         'elephant.unitary_event_analysis'). If None, all neurons are
         participated.
         Default: None
+    time_unit : pq.Quantity
+        This time unit is used for all calculations which requires a time
+        quantity. (Default: [s])
 
     Attributes
     ----------
-    time_unit : pq.Quantity
-        This time unit is used for all calculations which requires a time
-        quantity. (Default: [ms])
     data_available_in_mv : boolean
         Reflects the status of spike trains in the memory window. It is True,
         when spike trains are in the memory window which were not yet analyzed.
@@ -330,29 +330,27 @@ class OnlineUnitaryEventAnalysis:
     """
     def __init__(self, bw_size=0.005 * pq.s, trigger_events=None,
                  trigger_pre_size=0.5 * pq.s, trigger_post_size=0.5 * pq.s,
-                 saw_size=0.1 * pq.s, saw_step=0.005*pq.s, n_neurons=2,
-                 pattern_hash=None):
+                 saw_size=0.1 * pq.s, saw_step=0.005 * pq.s, n_neurons=2,
+                 pattern_hash=None, time_unit=1*pq.s):
         """
         Constructor. Initializes all attributes of the new instance.
         """
-        # use this time unit for all calculations
-        self.time_unit = 1 * pq.s  # Todo: maybe change to ms
-
         # state controlling booleans for the updating algorithm
         self.data_available_in_mv = None
         self.waiting_for_new_trigger = True
         self.trigger_events_left_over = True
 
         # save constructor parameters
-        self.bw_size = bw_size
+        self.time_unit = time_unit
+        self.bw_size = bw_size.rescale(self.time_unit)
         if trigger_events is None:
             self.trigger_events = []
         else:
-            self.trigger_events = trigger_events.tolist()
-        self.trigger_pre_size = trigger_pre_size
-        self.trigger_post_size = trigger_post_size
-        self.saw_size = saw_size  # multiple of bw_size
-        self.saw_step = saw_step  # multiple of bw_size
+            self.trigger_events = trigger_events.rescale(self.time_unit).tolist()
+        self.trigger_pre_size = trigger_pre_size.rescale(self.time_unit)
+        self.trigger_post_size = trigger_post_size.rescale(self.time_unit)
+        self.saw_size = saw_size.rescale(self.time_unit)  # multiple of bw_size
+        self.saw_step = saw_step.rescale(self.time_unit)  # multiple of bw_size
         self.n_neurons = n_neurons
         if pattern_hash is None:
             pattern = [1] * n_neurons
@@ -364,7 +362,7 @@ class OnlineUnitaryEventAnalysis:
         self.mw = [[] for _ in range(self.n_neurons)]  # array of all spiketimes
 
         # initialize helper variables for the trial window (tw)
-        self.tw_size = trigger_pre_size + trigger_post_size
+        self.tw_size = self.trigger_pre_size + self.trigger_post_size
         self.tw = [[] for _ in range(self.n_neurons)]  # pointer to slice of mw
         self.tw_counter = 0
 
@@ -390,7 +388,7 @@ class OnlineUnitaryEventAnalysis:
                                      win_size=self.saw_size.rescale(pq.ms),
                                      win_step=self.saw_step.rescale(pq.ms),
                                      method=self.method,
-                                     t_start=0*pq.s,
+                                     t_start=0 * time_unit,
                                      t_stop=self.tw_size,
                                      n_surrogates=self.n_surrogates)
 
@@ -433,7 +431,7 @@ class OnlineUnitaryEventAnalysis:
                        self.n_exp.astype(np.float64)).flatten()
         self.Js = jointJ(p)
         self.rate_avg = (self.rate_avg * (self.saw_size / self.bw_size)) / \
-                        (self.saw_size.rescale(pq.ms) * self.n_trials)
+                        (self.saw_size * self.n_trials)
         return {
             'Js': self.Js.reshape(
                 (self.n_windows, self.n_hashes)).astype(np.float32),
@@ -733,15 +731,18 @@ class OnlineUnitaryEventAnalysis:
                     of the current trial
 
         """
-        # rescale spiketrains to ms
-        spiketrains = [st.rescale(self.time_unit) for st in spiketrains]
+        # rescale spiketrains to time_unit
+        spiketrains = [st.rescale(self.time_unit)
+                       if st.t_start.units == st.units == st.t_stop
+                       else st.rescale(st.units).rescale(self.time_unit)
+                       for st in spiketrains]
 
         if events is None:
             events = np.array([])
         if len(events) > 0:
             for event in events:
                 if event not in self.trigger_events:
-                    self.trigger_events.append(event)
+                    self.trigger_events.append(event.rescale(self.time_unit))
             self.trigger_events.sort()
             self.n_trials = len(self.trigger_events)
         # save incoming spikes (IDW) into memory (MW)
@@ -756,14 +757,14 @@ class OnlineUnitaryEventAnalysis:
             if self.tw_counter == self.n_trials:
                 break
             if self.n_trials == 0:
-                current_trigger_event = np.inf * pq.s
-                next_trigger_event = np.inf * pq.s
+                current_trigger_event = np.inf * self.time_unit
+                next_trigger_event = np.inf * self.time_unit
             else:
                 current_trigger_event = self.trigger_events[self.tw_counter]
                 if self.tw_counter <= self.n_trials - 2:
                     next_trigger_event = self.trigger_events[self.tw_counter+1]
                 else:
-                    next_trigger_event = np.inf * pq.s
+                    next_trigger_event = np.inf * self.time_unit
     
             # # case 1: pre/post trial analysis,
             # i.e. waiting for IDW  with new trigger event
@@ -818,7 +819,7 @@ class OnlineUnitaryEventAnalysis:
     def reset(self, bw_size=0.005 * pq.s, trigger_events=None,
               trigger_pre_size=0.5 * pq.s, trigger_post_size=0.5 * pq.s,
               saw_size=0.1 * pq.s, saw_step=0.005*pq.s, n_neurons=2,
-              pattern_hash=None):
+              pattern_hash=None, time_unit=1*pq.s):
         """
         Resets all class attributes to their initial value.
 
@@ -833,4 +834,4 @@ class OnlineUnitaryEventAnalysis:
         """
         self.__init__(bw_size, trigger_events, trigger_pre_size,
                       trigger_post_size, saw_size, saw_step, n_neurons,
-                      pattern_hash)
+                      pattern_hash, time_unit)
