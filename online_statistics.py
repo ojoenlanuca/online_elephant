@@ -1,5 +1,5 @@
 import warnings
-from collections import defaultdict
+from collections import defaultdict, deque
 from math import ceil
 
 import elephant.conversion as conv
@@ -203,6 +203,10 @@ class OnlineUnitaryEventAnalysis:
     time_unit : pq.Quantity
         This time unit is used for all calculations which requires a time
         quantity. (Default: [s])
+    save_n_trials : (positive) int
+        The number of trials `n` which will be saved after their analysis with a
+        queue following the FIFO strategy (first in, first out), i.e. only
+        the last `n` analyzed trials will be stored. (default: None)
 
     Attributes
     ----------
@@ -331,7 +335,7 @@ class OnlineUnitaryEventAnalysis:
     def __init__(self, bw_size=0.005 * pq.s, trigger_events=None,
                  trigger_pre_size=0.5 * pq.s, trigger_post_size=0.5 * pq.s,
                  saw_size=0.1 * pq.s, saw_step=0.005 * pq.s, n_neurons=2,
-                 pattern_hash=None, time_unit=1*pq.s):
+                 pattern_hash=None, time_unit=1*pq.s, save_n_trials=None):
         """
         Constructor. Initializes all attributes of the new instance.
         """
@@ -357,6 +361,7 @@ class OnlineUnitaryEventAnalysis:
             self.pattern_hash = hash_from_pattern(pattern)
         if np.issubdtype(type(self.pattern_hash), np.integer):
             self.pattern_hash = [int(self.pattern_hash)]
+        self.save_n_trials = save_n_trials
 
         # initialize helper variables for the memory window (mw)
         self.mw = [[] for _ in range(self.n_neurons)]  # array of all spiketimes
@@ -378,6 +383,9 @@ class OnlineUnitaryEventAnalysis:
         # determine the number trials and the number of patterns (hashes)
         self.n_trials = len(self.trigger_events)
         self.n_hashes = len(self.pattern_hash)
+        # (optional) save last `n` analysed trials for visualization
+        if self.save_n_trials is not None:
+            self.all_trials = deque(maxlen=self.save_n_trials)
 
         # save input parameters as dict like the offline version of UEA it does
         # to facilitate a later comparison of the used parameters
@@ -401,6 +409,21 @@ class OnlineUnitaryEventAnalysis:
         self.rate_avg = np.zeros(
             (self.n_windows, self.n_hashes, self.n_neurons), dtype=np.float64)
         self.indices = defaultdict(list)
+
+    def get_all_saved_trials(self):
+        """
+        Return the last `n`-trials which were analyzed.
+
+        `n` is the number of trials which were saved after their analysis
+        using a queue with the FIFO strategy (first in, first out).
+
+        Returns
+        -------
+            : list of list of neo.SpikeTrain
+            A nested list of trials, neurons and their neo.SpikeTrain objects,
+            respectively.
+        """
+        return list(self.all_trials)
 
     def get_results(self):
         """
@@ -687,6 +710,22 @@ class OnlineUnitaryEventAnalysis:
                 #  move MV after SAW is finished with analysis of one trial
                 self._move_mw(new_t_start=self.trigger_events[
                                               self.tw_counter] + self.tw_size)
+                # save analysed trial for visualization
+                if self.save_n_trials:
+                    _trial_start = 0*pq.s
+                    _trial_stop = self.tw_size
+                    _offset = self.trigger_events[self.tw_counter] - \
+                        self.trigger_pre_size
+                    normalized_spike_times = []
+                    for n in range(self.n_neurons):
+                        normalized_spike_times.append(
+                            np.array(self.tw[n])*self.time_unit - _offset)
+                    self.all_trials.append(
+                        [neo.SpikeTrain(normalized_spike_times[m],
+                                        t_start=_trial_start,
+                                        t_stop=_trial_stop,
+                                        units=self.time_unit)
+                         for m in range(self.n_neurons)])
                 # reset bw
                 self.bw = np.zeros_like(self.bw)
                 if self.tw_counter <= self.n_trials - 1:

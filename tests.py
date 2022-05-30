@@ -307,11 +307,11 @@ def _visualize_results_of_offline_and_online_uea(
         spiketrains, ue_dict_offline, ue_dict_online, alpha):
     viziphant.unitary_event_analysis.plot_ue(
         spiketrains, Js_dict=ue_dict_offline, significance_level=alpha,
-        unit_real_ids=['1', '2'])
+        unit_real_ids=['1', '2'], suptitle="offline")
     plt.show()
     viziphant.unitary_event_analysis.plot_ue(
         spiketrains, Js_dict=ue_dict_online, significance_level=alpha,
-        unit_real_ids=['1', '2'])
+        unit_real_ids=['1', '2'], suptitle="online")
     plt.show()
 
 
@@ -356,7 +356,6 @@ def _load_real_data(n_trials, trial_length, time_unit):
     # each segment contains a single trial
     for ind in range(len(block.segments)):
         spiketrains.append(block.segments[ind].spiketrains)
-
     # for each neuron: concatenate all trials to one long neo.Spiketrain
     st1_long = [spiketrains[i].multiplexed[1][
                     np.where(spiketrains[i].multiplexed[0] == 0)]
@@ -375,6 +374,8 @@ def _load_real_data(n_trials, trial_length, time_unit):
                              t_stop=n_trials * trial_length).rescale(time_unit)
     neo_st2 = neo.SpikeTrain((st2_concat / 1000) * pq.s, t_start=0 * pq.s,
                              t_stop=n_trials * trial_length).rescale(time_unit)
+    spiketrains = [[st[j].rescale(time_unit) for j in range(len(st))] for st in
+                   spiketrains]
     return spiketrains, neo_st1, neo_st2
 
 
@@ -392,10 +393,26 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(73)
-        cls.time_unit = 1 * pq.s
+        cls.time_unit = 1 * pq.ms    #fixme: ks still raises error in BinnedSpiketrain.to_bool_array()
+                                     #fixme: plot_ue() assumes ms-Quantitiies for input parameters --> offline version/dict needs explicit rescale
+        cls.last_n_trials = 20
 
     def setUp(self):
         pass
+
+    def _assert_equality_of_passed_and_saved_trials(
+            self, last_n_trials, passed_trials, saved_trials):
+        eps_float64 = np.finfo(np.float64).eps
+        n_neurons = len(passed_trials[0])
+        with self.subTest("test 'trial' equality"):
+            for t in range(last_n_trials):
+                for n in range(n_neurons):
+                    np.testing.assert_allclose(
+                        actual=saved_trials[-t][n].rescale(
+                            self.time_unit).magnitude,
+                        desired=saved_trials[-t][n].rescale(
+                            self.time_unit).magnitude,
+                        atol=eps_float64, rtol=eps_float64)
 
     def _assert_equality_of_result_dicts(self, ue_dict_offline, ue_dict_online,
                                          tol_dict_user):
@@ -482,6 +499,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
 
         # create instance of OnlineUnitaryEventAnalysis
         # TODO: use one pyhsical unit as standard and rescale others accordingly
+        _last_n_trials = min(self.last_n_trials, len(spiketrains))
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=(0.005 * pq.s).rescale(time_unit),
             trigger_pre_size=(0. * pq.s).rescale(time_unit),
@@ -489,7 +507,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             saw_size=(0.1 * pq.s).rescale(time_unit),
             saw_step=(0.005 * pq.s).rescale(time_unit),
             trigger_events=init_events,
-            time_unit=time_unit)
+            time_unit=time_unit,
+            save_n_trials=_last_n_trials)
         # perform online unitary events analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
@@ -503,7 +522,10 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         self._assert_equality_of_result_dicts(
             ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
             tol_dict_user={})
-        # fixme: larger atol & rtol ok?
+
+        self._assert_equality_of_passed_and_saved_trials(
+            last_n_trials=_last_n_trials, passed_trials=spiketrains,
+            saved_trials=ouea.get_all_saved_trials())
 
         # visualize results of online and standard UEA for real data
         # _visualize_results_of_offline_and_online_uea(
@@ -557,6 +579,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             raise ValueError("Illeagal method to pass events!")
 
         # create instance of OnlineUnitaryEventAnalysis
+        _last_n_trials = min(self.last_n_trials, len(spiketrains))
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=(0.005 * pq.s).rescale(time_unit),
             trigger_pre_size=trigger_pre_size,
@@ -564,7 +587,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             saw_size=(0.1 * pq.s).rescale(time_unit),
             saw_step=(0.005 * pq.s).rescale(time_unit),
             trigger_events=init_events,
-            time_unit=time_unit)
+            time_unit=time_unit,
+            save_n_trials=_last_n_trials)
         # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
@@ -578,7 +602,10 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
         self._assert_equality_of_result_dicts(
             ue_dict_offline=ue_dict, ue_dict_online=ue_dict_online,
             tol_dict_user={})
-        # fixme: larger atol ok?
+
+        self._assert_equality_of_passed_and_saved_trials(
+            last_n_trials=_last_n_trials, passed_trials=spiketrains,
+            saved_trials=ouea.get_all_saved_trials())
 
         # visualize results of online and standard UEA for artifical data
         # _visualize_results_of_offline_and_online_uea(
