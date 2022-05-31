@@ -345,6 +345,11 @@ class OnlineUnitaryEventAnalysis:
         self.trigger_events_left_over = True
 
         # save constructor parameters
+        if time_unit.units != (pq.s and pq.ms):
+            warnings.warn(message=f"Unusual time units like {time_unit} can "
+                                  f"cause numerical imprecise results. "
+                                  f"Use `ms` or `s` instead!",
+                          category=UserWarning)
         self.time_unit = time_unit
         self.bw_size = bw_size.rescale(self.time_unit)
         if trigger_events is None:

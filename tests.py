@@ -305,6 +305,11 @@ def _generate_spiketrains(freq, length, trigger_events, injection_pos,
 
 def _visualize_results_of_offline_and_online_uea(
         spiketrains, online_trials, ue_dict_offline, ue_dict_online, alpha):
+    # rescale input-params 'bin_size', win_size' and 'win_step' to ms,
+    # because plot_ue() expects these parameters in ms
+    ue_dict_offline["input_parameters"]["bin_size"].units = pq.ms
+    ue_dict_offline["input_parameters"]["win_size"].units = pq.ms
+    ue_dict_offline["input_parameters"]["win_step"].units = pq.ms
     viziphant.unitary_event_analysis.plot_ue(
         spiketrains, Js_dict=ue_dict_offline, significance_level=alpha,
         unit_real_ids=['1', '2'], suptitle="offline")
@@ -400,9 +405,8 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(73)
-        cls.time_unit = 1 * pq.ms    #fixme: ks still raises error in BinnedSpiketrain.to_bool_array()
-                                     #fixme: plot_ue() assumes ms-Quantitiies for input parameters --> offline version/dict needs explicit rescale
-        cls.last_n_trials = 20
+        cls.time_unit = 1 * pq.ms
+        cls.last_n_trials = 50
 
     def setUp(self):
         pass
@@ -505,7 +509,6 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             raise ValueError("Illeagal method to pass events!")
 
         # create instance of OnlineUnitaryEventAnalysis
-        # TODO: use one pyhsical unit as standard and rescale others accordingly
         _last_n_trials = min(self.last_n_trials, len(spiketrains))
         ouea = OnlineUnitaryEventAnalysis(
             bw_size=(0.005 * pq.s).rescale(time_unit),
