@@ -304,13 +304,20 @@ def _generate_spiketrains(freq, length, trigger_events, injection_pos,
 
 
 def _visualize_results_of_offline_and_online_uea(
-        spiketrains, ue_dict_offline, ue_dict_online, alpha):
+        spiketrains, online_trials, ue_dict_offline, ue_dict_online, alpha):
     viziphant.unitary_event_analysis.plot_ue(
         spiketrains, Js_dict=ue_dict_offline, significance_level=alpha,
         unit_real_ids=['1', '2'], suptitle="offline")
     plt.show()
+    # reorder and rename indices-dict of ue_dict_online, if only the last
+    # n-trials were saved; indices-entries of unused trials are overwritten
+    if len(online_trials) < len(spiketrains):
+        _diff_n_trials = len(spiketrains) - len(online_trials)
+        for i in range(len(online_trials)):
+            ue_dict_online["indices"][f"trial{i}"] = ue_dict_online["indices"].pop(
+                f"trial{i+_diff_n_trials}")
     viziphant.unitary_event_analysis.plot_ue(
-        spiketrains, Js_dict=ue_dict_online, significance_level=alpha,
+        online_trials, Js_dict=ue_dict_online, significance_level=alpha,
         unit_real_ids=['1', '2'], suptitle="online")
     plt.show()
 
@@ -529,7 +536,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
 
         # visualize results of online and standard UEA for real data
         # _visualize_results_of_offline_and_online_uea(
-        #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
+        #     spiketrains=spiketrains,
+        #     online_trials=ouea.get_all_saved_trials(),
+        #     ue_dict_offline=ue_dict,
         #     ue_dict_online=ue_dict_online, alpha=0.05)
 
         return ouea
@@ -609,7 +618,9 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
 
         # visualize results of online and standard UEA for artifical data
         # _visualize_results_of_offline_and_online_uea(
-        #     spiketrains=spiketrains, ue_dict_offline=ue_dict,
+        #     spiketrains=spiketrains,
+        #     online_trials=ouea.get_all_saved_trials(),
+        #     ue_dict_offline=ue_dict,
         #     ue_dict_online=ue_dict_online, alpha=0.01)
 
         return ouea
