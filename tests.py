@@ -269,8 +269,8 @@ def _generate_spiketrains(freq, length, trigger_events, injection_pos,
                           trigger_pre_size, trigger_post_size,
                           time_unit=1*pq.s):
     """
-    Generate two spiketrains from an homogeneous Poisson process with
-    injected coincideces.
+    Generate two spiketrains from a homogeneous Poisson process with
+    injected coincidences.
     """
     st1 = homogeneous_poisson_process(rate=freq,
                                       t_start=(0*pq.s).rescale(time_unit),
@@ -299,6 +299,7 @@ def _generate_spiketrains(freq, length, trigger_events, injection_pos,
         t_stop=i + trigger_post_size).time_shift(-i + trigger_pre_size)
                    for i in trigger_events]
     spiketrains = np.stack((st1_stacked, st2_stacked), axis=1)
+    spiketrains = spiketrains.tolist()
 
     return spiketrains, st1, st2
 
@@ -319,8 +320,8 @@ def _visualize_results_of_offline_and_online_uea(
     if len(online_trials) < len(spiketrains):
         _diff_n_trials = len(spiketrains) - len(online_trials)
         for i in range(len(online_trials)):
-            ue_dict_online["indices"][f"trial{i}"] = ue_dict_online["indices"].pop(
-                f"trial{i+_diff_n_trials}")
+            ue_dict_online["indices"][f"trial{i}"] = \
+                ue_dict_online["indices"].pop(f"trial{i+_diff_n_trials}")
     viziphant.unitary_event_analysis.plot_ue(
         online_trials, Js_dict=ue_dict_online, significance_level=alpha,
         unit_real_ids=['1', '2'], suptitle="online")
@@ -371,11 +372,11 @@ def _load_real_data(n_trials, trial_length, time_unit):
     # for each neuron: concatenate all trials to one long neo.Spiketrain
     st1_long = [spiketrains[i].multiplexed[1][
                     np.where(spiketrains[i].multiplexed[0] == 0)]
-                + i * (trial_length)
+                + i * trial_length
                 for i in range(len(spiketrains))]
     st2_long = [spiketrains[i].multiplexed[1][
                     np.where(spiketrains[i].multiplexed[0] == 1)]
-                + i * (trial_length)
+                + i * trial_length
                 for i in range(len(spiketrains))]
     st1_concat = st1_long[0]
     st2_concat = st2_long[0]
@@ -506,7 +507,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             init_events = np.array([]) * time_unit
             reading_events = trigger_events
         else:
-            raise ValueError("Illeagal method to pass events!")
+            raise ValueError("Illegal method to pass events!")
 
         # create instance of OnlineUnitaryEventAnalysis
         _last_n_trials = min(self.last_n_trials, len(spiketrains))
@@ -519,7 +520,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             trigger_events=init_events,
             time_unit=time_unit,
             save_n_trials=_last_n_trials)
-        # perform online unitary events analysis
+        # perform online unitary event analysis
         # simulate buffered reading/transport of spiketrains,
         # i.e. loop over spiketrain list and call update_ue()
         _simulate_buffered_reading(n_buffers=n_buffers, ouea=ouea, st1=neo_st1,
@@ -588,7 +589,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             init_events = np.array([]) * time_unit
             reading_events = trigger_events
         else:
-            raise ValueError("Illeagal method to pass events!")
+            raise ValueError("Illegal method to pass events!")
 
         # create instance of OnlineUnitaryEventAnalysis
         _last_n_trials = min(self.last_n_trials, len(spiketrains))
@@ -619,7 +620,7 @@ class TestOnlineUnitaryEventAnalysis(unittest.TestCase):
             last_n_trials=_last_n_trials, passed_trials=spiketrains,
             saved_trials=ouea.get_all_saved_trials())
 
-        # visualize results of online and standard UEA for artifical data
+        # visualize results of online and standard UEA for artificial data
         # _visualize_results_of_offline_and_online_uea(
         #     spiketrains=spiketrains,
         #     online_trials=ouea.get_all_saved_trials(),

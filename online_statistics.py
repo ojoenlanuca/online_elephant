@@ -505,7 +505,7 @@ class OnlineUnitaryEventAnalysis:
         This function appends for each neuron all the spikes which are arriving
         with 'idw' into the respective  sub-list of 'mv'.
 
-        Prameters
+        Parameters
         ---------
         idw : list of pq.Quantity arrays
             * 0-axis --> Neurons
@@ -653,7 +653,7 @@ class OnlineUnitaryEventAnalysis:
         Move sliding analysis window (SAW) over trial window (TW).
 
         This method iterates over each sliding analysis window position and
-        applies at each position the unitary events analysis, i.e. within each
+        applies at each position the unitary event analysis, i.e. within each
         window it counts the empirically found coincidences and saves their
         indices where they appeared, calculates the expected number of
         coincidences and determines the firing rates of the neurons.
@@ -759,7 +759,7 @@ class OnlineUnitaryEventAnalysis:
             * if an overlap between successive trials exists, spike data
                 of these trials will be analysed twice. The user should adjust
                 the trigger events and/or the trial window size to increase
-                the interval between successive trials to avaid an overlap.
+                the interval between successive trials to avoid an overlap.
 
         Notes
         -----
@@ -791,7 +791,7 @@ class OnlineUnitaryEventAnalysis:
             self.n_trials = len(self.trigger_events)
         # save incoming spikes (IDW) into memory (MW)
         self._save_idw_into_mw(spiketrains)
-        # extract relevant time informations
+        # extract relevant time information
         idw_t_start = spiketrains[0].t_start
         idw_t_stop = spiketrains[0].t_stop
         
